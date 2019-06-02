@@ -12,7 +12,7 @@ import net.corda.core.schemas.QueryableState
 data class IDState( val ParticipantA: Party,
                     val ParticipantB: Party,
                     override val linearId: UniqueIdentifier = UniqueIdentifier()):
-        LinearState, QueryableState {
+    LinearState, QueryableState {
     /** The public keys of the involved parties. */
     override val participants: List<AbstractParty> get() = listOf(ParticipantA, ParticipantB)
 }
