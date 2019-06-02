@@ -4,6 +4,7 @@ import org.w3c.dom.Node
 import org.w3c.dom.NodeList
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
+
 open class XmlReader(private val xmlPath : String) {
 
     fun readXml(): Document {
@@ -72,6 +73,41 @@ open class XmlReader(private val xmlPath : String) {
       }
       return null
     }
+
+    fun getInitParticipanForTask(doc: Document, choreoTasks: ArrayList<Node>) : ArrayList<Node> {
+      val participantNodes = getElementValuesByAttributeName(doc, "participant")
+      val initParticipants = ArrayList<Node>()
+      for(i in 1..choreoTasks.size - 2){
+        val participant = getInitParticipanForTask(choreoTasks.get(i), participantNodes)
+        initParticipants.add(participant!!)
+        println(getValueOfNode(participant, "name"))
+      }
+      return initParticipants
+    }
+
+    fun generateContractFile(doc: Document, participants: MutableSet<String>) {
+      val contractId = getValueOfNode(getElementValuesByAttributeName(doc, "choreography").item(0), "id")
+      val files = arrayOf("contractTemplate.kt", "stateTemplate.kt")
+      for (file in files) {
+          val f = File(file)
+          var text = f.readText()
+          println(text)
+          text = text.replace("ID", contractId)
+          text = text.replace("ParticipantA", participants.elementAt(0))
+          text = text.replace("ParticipantB",participants.elementAt(1))
+          var generatingFile : File
+          if(file == "contractTemplate.kt"){
+            generatingFile = File("./" + contractId + "/" + contractId + "Contract.kt")
+          } else {
+            generatingFile = File("./" + contractId + "/" + contractId + "State.kt")
+          }
+          generatingFile.writeText(text)
+          println(generatingFile.readText())
+      }
+
+
+    }
+
 }
 fun main(args: Array<String>) {
   val xmlReader = XmlReader("./Pizza-Choreo_simple.bpmn")
@@ -97,12 +133,7 @@ fun main(args: Array<String>) {
   }
   println()
   val choreoTasks = xmlReader.generateChoreoTaskOrder(doc)
-  val initParticipants = ArrayList<Node>()
-  for(i in 1..choreoTasks.size - 2){
-    val participant = xmlReader.getInitParticipanForTask(choreoTasks.get(i), participantNodes)
-    initParticipants.add(participant!!)
-    println(xmlReader.getValueOfNode(participant, "name"))
-  }
+  val initParticipants = xmlReader.getInitParticipanForTask(doc, choreoTasks)
   val messages = ArrayList<String>()
   for(i in 0..initParticipants.size - 1){
     val extensionElement = xmlReader.getChildNodeByName(initParticipants.get(i), "extensionElements")
@@ -111,4 +142,5 @@ fun main(args: Array<String>) {
     println(message)
     messages.add(message)
   }
+  xmlReader.generateContractFile(doc)
 }
