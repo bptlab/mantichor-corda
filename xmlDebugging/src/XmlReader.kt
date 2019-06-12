@@ -65,7 +65,7 @@ open class XmlReader(private val xmlPath : String) {
         return choreo
     }
 
-    fun getInitParticipanForTask(taskNode: Node, participants: NodeList) : Node?{
+    fun getInitParticipantForTask(taskNode: Node, participants: NodeList) : Node?{
         for(i in 0..participants.length - 1){
             if(getValueOfNode(participants.item(i), "id") == getValueOfNode(taskNode, "initiatingParticipantRef")){
                 return participants.item(i)
@@ -74,21 +74,105 @@ open class XmlReader(private val xmlPath : String) {
         return null
     }
 
-    fun getInitParticipanForTask(doc: Document, choreoTasks: ArrayList<Node>) : ArrayList<Node> {
+    fun getInitParticipantForTasks(doc: Document, choreoTasks: ArrayList<Node>) : ArrayList<Node> {
         val participantNodes = getElementValuesByAttributeName(doc, "participant")
         val initParticipants = ArrayList<Node>()
         for(i in 1..choreoTasks.size - 2){
-            val participant = getInitParticipanForTask(choreoTasks.get(i), participantNodes)
+            val participant = getInitParticipantForTask(choreoTasks.get(i), participantNodes)
             initParticipants.add(participant!!)
             println(getValueOfNode(participant, "name"))
         }
         return initParticipants
     }
 
-    fun generateContractFile(doc: Document, participants: MutableSet<String>) {
+    fun generateStateHandling(commands: MutableSet<String>) : String {
+        val indention = "                "
+        var handleString = ""
+        for(i in 0..commands.size - 1) {
+            handleString += indention + "is Commands." + commands.elementAt(i) + " -> {\n"
+            handleString += indention + "    val input = inputs.single()\n"
+            handleString += indention + "    requireThat {\n"
+            handleString += indention + "        \"the state is propagated\" using (outputs.size == 1)\n"
+            handleString += indention + "    }\n"
+            handleString += indention + "}\n"
+        }
+        return  handleString
+    }
+
+    fun generateFunctions(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList) : String {
+        val participants = getElementValuesByAttributeName(doc, "participant")
+        val indention = "        "
+        var functions = ""
+        for(i in 0..tasks.size - 1) {
+            val correspondingNode = nodeTasks.item(i)
+            val parts = crawlChilds(correspondingNode, participants)
+            val command = tasks.elementAt(i)
+            val camelCaseCommand = generateCamelCaseName(command)
+            functions += "    fun generate" + camelCaseCommand.capitalize() + " ("
+            for(j in 0..parts.size - 1) {
+                functions += parts.elementAt(j) + ": PartyAndReference"
+                if(j < parts.size - 1) {
+                    functions += ", "
+                }
+            }
+            functions += ") : TransactionBuilder {\n"
+            functions += indention + "val state = State("
+                    for(j in 0..parts.size - 1) {
+                        functions += parts.elementAt(j) + ", " +
+                        parts.elementAt(j) + ".party"
+                if(j < parts.size - 1) {
+                    functions += ", "
+                }
+            }
+            functions += ")\n" +
+                    indention + "val stateAndContract = StateAndContract(state, CP_PROGRAM_ID)\n" +
+                    indention + "return TransactionBuilder(notary = notary)" +
+                    ".withItems(stateAndContract, Command(Commands." + camelCaseCommand + "(), "
+            for(j in 0..parts.size - 1) {
+                functions += parts.elementAt(j) + ".party.owningKey"
+                if(j < parts.size - 1) {
+                    functions += ", "
+                }
+            }
+            functions += "))\n    }\n\n"
+        }
+        return functions
+    }
+
+    fun crawlChilds(node: Node, participants: NodeList) : MutableSet<String>{
+        val partsIDs = mutableSetOf<String>()
+        val childs = node.childNodes
+
+        for(i in 0..childs.length -1) {
+            if(childs.item(i).nodeName == "participantRef") {
+                partsIDs.add(childs.item(i).textContent)
+            }
+        }
+        val parts = mutableSetOf<String>()
+        for(i in 0..participants.length - 1) {
+            for(j in 0..partsIDs.size - 1){
+                if(getValueOfNode(participants.item(i), "id") == partsIDs.elementAt(j)){
+                    parts.add(getValueOfNode(participants.item(i), "name"))
+                }
+            }
+        }
+        return parts
+    }
+
+    fun generateCamelCaseName(task: String) : String{
+        val splits = task.split(" ")
+        var camelCaseCommand = ""
+        for (j in 0..splits.size - 1) {
+            camelCaseCommand += splits[j].capitalize()
+        }
+        return camelCaseCommand
+    }
+
+    fun generateContractFile(doc: Document, participants: MutableSet<String>, tasks: MutableSet<String>) {
         val contractId = getValueOfNode(getElementValuesByAttributeName(doc, "choreography").item(0), "id")
         val files = arrayOf("src/contractTemplate.txt", "src/stateTemplate.txt")
         val subdirectory = File("./generated_contracts/" + contractId + "/")
+        val taskNodes = getElementValuesByAttributeName(doc, "choreographyTask")
         subdirectory.mkdirs()
         for (file in files) {
             val f = File(file)
@@ -99,6 +183,17 @@ open class XmlReader(private val xmlPath : String) {
             text = text.replace("ParticipantB",participants.elementAt(1))
             var generatingFile : File
             if(file == "src/contractTemplate.txt"){
+                val commands = mutableSetOf<String>()
+                var commandText = "\n        class Create : Commands"
+                for (i in 0..tasks.size - 1) {
+                    val command = tasks.elementAt(i)
+                    val camelCaseCommand = generateCamelCaseName(command)
+                    commands.add(camelCaseCommand)
+                    commandText = commandText + "\n        class " + camelCaseCommand + " : TypeOnlyCommandData(), Commands"
+                }
+                text = text.replace("\n        class AdditionalCommands : Commands", commandText)
+                text = text.replace("                HANDLECOMMANDS", generateStateHandling(commands))
+                text = text.replace("    AdditionalFunctions", generateFunctions(tasks, doc, taskNodes))
                 generatingFile = File("./generated_contracts/" + contractId + "/" + contractId + "Contract.kt")
             } else {
                 generatingFile = File("./generated_contracts/" + contractId + "/" + contractId + "State.kt")
@@ -118,7 +213,7 @@ fun main(args: Array<String>) {
     val participants = mutableSetOf<String>()
     for(i in 0..participantNodes.length - 1) {
         val node = participantNodes.item(i);
-        participants.add(xmlReader.getValueOfNode(node, "name"));
+        participants.add(xmlReader.getValueOfNode(node, "name"))
     }
     participants.forEach { e -> println(e)}
 
@@ -126,7 +221,7 @@ fun main(args: Array<String>) {
     val tasks = mutableSetOf<String>()
     for(i in 0..taskNodes.length - 1) {
         val node = taskNodes.item(i);
-        tasks.add(xmlReader.getValueOfNode(node, "name"));
+        tasks.add(xmlReader.getValueOfNode(node, "name"))
     }
     tasks.forEach { e -> println(e)}
     val foundNode = xmlReader.getNodeById(taskNodes, "sid-99ABCD46-49C9-4AD1-94B2-788BA9ACA06A")
@@ -135,7 +230,7 @@ fun main(args: Array<String>) {
     }
     println()
     val choreoTasks = xmlReader.generateChoreoTaskOrder(doc)
-    val initParticipants = xmlReader.getInitParticipanForTask(doc, choreoTasks)
+    val initParticipants = xmlReader.getInitParticipantForTasks(doc, choreoTasks)
     val messages = ArrayList<String>()
     for(i in 0..initParticipants.size - 1){
         val extensionElement = xmlReader.getChildNodeByName(initParticipants.get(i), "extensionElements")
@@ -144,5 +239,5 @@ fun main(args: Array<String>) {
         println(message)
         messages.add(message)
     }
-    xmlReader.generateContractFile(doc, participants)
+    xmlReader.generateContractFile(doc, participants, tasks)
 }
