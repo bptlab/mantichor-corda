@@ -11,22 +11,22 @@ import net.corda.core.schemas.QueryableState
 
 @BelongsToContract(_ID_Contract::class)
 data class Generated_ID_State( val ParticipantA: Party,
-                    val ParticipantB: Party,
-                    val stateEnum: Int,
-                    override val linearId: UniqueIdentifier = UniqueIdentifier()):
-    LinearState, QueryableState {
+                               val ParticipantB: Party,
+                               val stateEnum: Int,
+                               override val linearId: UniqueIdentifier = UniqueIdentifier()):
+        LinearState, QueryableState {
     /** The public keys of the involved parties. */
     override val participants: List<AbstractParty> get() = listOf(ParticipantA, ParticipantB)
     override fun generateMappedObject(schema: MappedSchema): PersistentState {
-            return when (schema) {
-                is _ID_V1 -> _ID_V1.Persistent_ID_(
-                        this.ParticipantA.name.toString(),
-                        this.ParticipantB.name.toString(),
-                        this.stateEnum.toString(),
-                        this.linearId.id
-                )
-                else -> throw IllegalArgumentException("Unrecognised schema $schema")
-            }
+        return when (schema) {
+            is _ID_V1 -> _ID_V1.Persistent_ID_(
+                    this.ParticipantA.name.toString(),
+                    this.ParticipantB.name.toString(),
+                    this.stateEnum.toString(),
+                    this.linearId.id
+            )
+            else -> throw IllegalArgumentException("Unrecognised schema $schema")
         }
-        override fun supportedSchemas(): Iterable<MappedSchema> = listOf(_ID_V1)
+    }
+    override fun supportedSchemas(): Iterable<MappedSchema> = listOf(_ID_V1)
 }

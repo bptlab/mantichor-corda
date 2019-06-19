@@ -20,7 +20,7 @@ open class XmlReader(private val xmlPath : String) {
     }
 
     fun getValueOfNode(node: Node, valueName: String) : String {
-
+        node.attributes.
         return node.attributes.getNamedItem(valueName).nodeValue
     }
 

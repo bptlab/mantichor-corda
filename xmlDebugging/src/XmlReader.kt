@@ -60,7 +60,6 @@ open class XmlReader(private val xmlPath : String) {
         }
         if(getNodeById(endNodes, getValueOfNode(sequenceFlow, "targetRef")) != null){
             choreo.add(getNodeById(endNodes, getValueOfNode(sequenceFlow, "targetRef"))!!)
-            println("We did it reddit")
         }
         return choreo
     }
@@ -86,13 +85,13 @@ open class XmlReader(private val xmlPath : String) {
     }
 
     fun generateStateHandling(commands: MutableSet<String>) : String {
-        val indention = "                "
+        val indention = "            "
         var handleString = ""
         for(i in 0..commands.size - 1) {
             handleString += indention + "is Commands." + commands.elementAt(i) + " -> {\n"
-            handleString += indention + "    val input = inputs.single()\n"
+            handleString += indention + "    val input = tx.inputs.single()\n"
             handleString += indention + "    requireThat {\n"
-            handleString += indention + "        \"the state is propagated\" using (outputs.size == 1)\n"
+            handleString += indention + "        \"the state is propagated\" using (tx.outputs.size == 1)\n"
             handleString += indention + "    }\n"
             handleString += indention + "}\n"
         }
@@ -100,9 +99,10 @@ open class XmlReader(private val xmlPath : String) {
     }
 
     fun generateFunctions(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList) : String {
-        val participants = getElementValuesByAttributeName(doc, "participant")
-        val indention = "        "
         var functions = ""
+        /*val participants = getElementValuesByAttributeName(doc, "participant")
+        val indention = "        "
+
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
             val parts = crawlChilds(correspondingNode, participants)
@@ -135,7 +135,7 @@ open class XmlReader(private val xmlPath : String) {
                 }
             }
             functions += "))\n    }\n\n"
-        }
+        }*/
         return functions
     }
 
@@ -168,41 +168,256 @@ open class XmlReader(private val xmlPath : String) {
         return camelCaseCommand
     }
 
+    fun generateInputs(participants: MutableSet<String>) : String {
+        var inputs = ""
+        for(i in 0..participants.size-1){
+           inputs += "\"\", "
+        }
+        return inputs
+    }
+
+    fun generateFlow(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String) : String {
+        var flow = ""
+        val participants = getElementValuesByAttributeName(doc, "participant")
+        flow += "    @InitiatingFlow\n" +
+                "    @StartableByRPC\n" +
+                "    class " + "Initiator" + "(val otherParty: Party) : FlowLogic<SignedTransaction>() {\n"
+        flow += "        companion object {\n" +
+                "            object GENERATING_TRANSACTION : Step(\"Generating transaction based on new Input.\")\n" +
+                "            object VERIFYING_TRANSACTION : Step(\"Verifying contract constraints.\")\n" +
+                "            object SIGNING_TRANSACTION : Step(\"Signing transaction with our private key.\")\n" +
+                "            object GATHERING_SIGS : Step(\"Gathering the counterparty's signature.\") {\n" +
+                "                override fun childProgressTracker() = CollectSignaturesFlow.tracker()\n" +
+                "            }\n" +
+                "\n" +
+                "            object FINALISING_TRANSACTION : Step(\"Obtaining notary signature and recording transaction.\") {\n" +
+                "                override fun childProgressTracker() = FinalityFlow.tracker()\n" +
+                "            }\n" +
+                "\n" +
+                "            fun tracker() = ProgressTracker(\n" +
+                "                    GENERATING_TRANSACTION,\n" +
+                "                    VERIFYING_TRANSACTION,\n" +
+                "                    SIGNING_TRANSACTION,\n" +
+                "                    GATHERING_SIGS,\n" +
+                "                    FINALISING_TRANSACTION\n" +
+                "            )\n" +
+                "        }\n"
+        flow += "        @Suspendable\n" +
+                "        override fun call(): SignedTransaction {\n" +
+                "            // Obtain a reference to the notary we want to use.\n" +
+                "            val notary = serviceHub.networkMapCache.notaryIdentities[0]\n" +
+                "\n" +
+                "            // Stage 1.\n" +
+                "            progressTracker.currentStep = GENERATING_TRANSACTION\n" +
+                "            // Generate an unsigned transaction.\n" +
+                "            val " + contractId + "State = Generated" + contractId + "State(serviceHub.myInfo.legalIdentities.first(), otherParty, 0)\n" +
+                "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + "Create" + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
+                "            val txBuilder = TransactionBuilder(notary)\n" +
+                "                    .addOutputState(pizzaState, Generated" + contractId + "Contract.ID)\n" +
+                "                    .addCommand(txCommand)\n" +
+                "\n" +
+                "            // Stage 2.\n" +
+                "            progressTracker.currentStep = VERIFYING_TRANSACTION\n" +
+                "            // Verify that the transaction is valid.\n" +
+                "            txBuilder.verify(serviceHub)\n" +
+                "\n" +
+                "            // Stage 3.\n" +
+                "            progressTracker.currentStep = SIGNING_TRANSACTION\n" +
+                "            // Sign the transaction.\n" +
+                "            val partSignedTx = serviceHub.signInitialTransaction(txBuilder)\n" +
+                "\n" +
+                "            // Stage 4.\n" +
+                "            progressTracker.currentStep = GATHERING_SIGS\n" +
+                "            // Send the state to the counterparty, and receive it back with their signature.\n" +
+                "            val otherPartySession = initiateFlow(otherParty)\n" +
+                "            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(otherPartySession), GATHERING_SIGS.childProgressTracker()))\n" +
+                "\n" +
+                "            // Stage 5.\n" +
+                "            progressTracker.currentStep = FINALISING_TRANSACTION\n" +
+                "            // Notarise and record the transaction in both parties' vaults.\n" +
+                "            return subFlow(FinalityFlow(fullySignedTx, setOf(otherPartySession), FINALISING_TRANSACTION.childProgressTracker()))\n" +
+                "        }\n" +
+                "    }\n"
+        flow += "    @InitiatedBy(" + "Initiator"+ "::class)\n" +
+                "    class " + "Acceptor" + "(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {\n" +
+                "        @Suspendable\n" +
+                "        override fun call(): SignedTransaction {\n" +
+                "            val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {\n" +
+                "                override fun checkTransaction(stx: SignedTransaction) = requireThat {\n" +
+                "                    val output = stx.tx.outputs.single().data\n" +
+                "                    \"This must be a valid transaction.\" using (output is Generated" + contractId + "State)\n" +
+                "                }\n" +
+                "            }\n" +
+                "            val txId = subFlow(signTransactionFlow).id\n" +
+                "\n" +
+                "            return subFlow(ReceiveFinalityFlow(otherPartySession, expectedTxId = txId))\n" +
+                "        }\n" +
+                "    }\n"
+        for(i in 0..tasks.size - 1) {
+            val correspondingNode = nodeTasks.item(i)
+            val parts = crawlChilds(correspondingNode, participants)
+            val command = tasks.elementAt(i)
+            val camelCaseCommand = generateCamelCaseName(command)
+            val initFlow = parts.elementAt(0) + camelCaseCommand.capitalize() + "Flow"
+            val reactingFlow = parts.elementAt(1) + camelCaseCommand.capitalize() + "Flow"
+            flow += "    @InitiatingFlow\n" +
+                    "    @StartableByRPC\n" +
+                    "    class " + initFlow + "(val otherParty: Party) : FlowLogic<SignedTransaction>() {\n"
+            flow += "        companion object {\n" +
+                    "            object GENERATING_TRANSACTION : Step(\"Generating transaction based on new Input.\")\n" +
+                    "            object VERIFYING_TRANSACTION : Step(\"Verifying contract constraints.\")\n" +
+                    "            object SIGNING_TRANSACTION : Step(\"Signing transaction with our private key.\")\n" +
+                    "            object GATHERING_SIGS : Step(\"Gathering the counterparty's signature.\") {\n" +
+                    "                override fun childProgressTracker() = CollectSignaturesFlow.tracker()\n" +
+                    "            }\n" +
+                    "\n" +
+                    "            object FINALISING_TRANSACTION : Step(\"Obtaining notary signature and recording transaction.\") {\n" +
+                    "                override fun childProgressTracker() = FinalityFlow.tracker()\n" +
+                    "            }\n" +
+                    "\n" +
+                    "            fun tracker() = ProgressTracker(\n" +
+                    "                    GENERATING_TRANSACTION,\n" +
+                    "                    VERIFYING_TRANSACTION,\n" +
+                    "                    SIGNING_TRANSACTION,\n" +
+                    "                    GATHERING_SIGS,\n" +
+                    "                    FINALISING_TRANSACTION\n" +
+                    "            )\n" +
+                    "        }\n"
+            flow += "        @Suspendable\n" +
+                    "        override fun call(): SignedTransaction {\n" +
+                    "            // Obtain a reference to the notary we want to use.\n" +
+                    "            val notary = serviceHub.networkMapCache.notaryIdentities[0]\n" +
+                    "\n" +
+                    "            // Stage 1.\n" +
+                    "            progressTracker.currentStep = GENERATING_TRANSACTION\n" +
+                    "            // Generate an unsigned transaction.\n" +
+                    "            val " + contractId + "State = Generated" + contractId + "State(serviceHub.myInfo.legalIdentities.first(), otherParty, 0)\n" +
+                    "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + camelCaseCommand.capitalize() + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
+                    "            val txBuilder = TransactionBuilder(notary)\n" +
+                    "                    .addOutputState(pizzaState, Generated" + contractId + "Contract.ID)\n" +
+                    "                    .addCommand(txCommand)\n" +
+                    "\n" +
+                    "            // Stage 2.\n" +
+                    "            progressTracker.currentStep = VERIFYING_TRANSACTION\n" +
+                    "            // Verify that the transaction is valid.\n" +
+                    "            txBuilder.verify(serviceHub)\n" +
+                    "\n" +
+                    "            // Stage 3.\n" +
+                    "            progressTracker.currentStep = SIGNING_TRANSACTION\n" +
+                    "            // Sign the transaction.\n" +
+                    "            val partSignedTx = serviceHub.signInitialTransaction(txBuilder)\n" +
+                    "\n" +
+                    "            // Stage 4.\n" +
+                    "            progressTracker.currentStep = GATHERING_SIGS\n" +
+                    "            // Send the state to the counterparty, and receive it back with their signature.\n" +
+                    "            val otherPartySession = initiateFlow(otherParty)\n" +
+                    "            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(otherPartySession), GATHERING_SIGS.childProgressTracker()))\n" +
+                    "\n" +
+                    "            // Stage 5.\n" +
+                    "            progressTracker.currentStep = FINALISING_TRANSACTION\n" +
+                    "            // Notarise and record the transaction in both parties' vaults.\n" +
+                    "            return subFlow(FinalityFlow(fullySignedTx, setOf(otherPartySession), FINALISING_TRANSACTION.childProgressTracker()))\n" +
+                    "        }\n" +
+                    "    }\n"
+            flow += "    @InitiatedBy(" + initFlow + "::class)\n" +
+                    "    class " + reactingFlow + "(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {\n" +
+                    "        @Suspendable\n" +
+                    "        override fun call(): SignedTransaction {\n" +
+                    "            val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {\n" +
+                    "                override fun checkTransaction(stx: SignedTransaction) = requireThat {\n" +
+                    "                    val output = stx.tx.outputs.single().data\n" +
+                    "                    \"This must be a valid transaction.\" using (output is Generated" + contractId + "State)\n" +
+                    "                }\n" +
+                    "            }\n" +
+                    "            val txId = subFlow(signTransactionFlow).id\n" +
+                    "\n" +
+                    "            return subFlow(ReceiveFinalityFlow(otherPartySession, expectedTxId = txId))\n" +
+                    "        }\n" +
+                    "    }\n"
+            }
+        return flow
+    }
+
+    fun generateNodes(participants: MutableSet<String>) : String{
+        var nodes = ""
+        var ports = 10004
+        for(i in 0..participants.size-1){
+            nodes += "    node {\n" +
+                     "        name \"O=" + participants.elementAt(i) + ",L=London,C=GB\"\n" +
+                     "        p2pPort " + ports + "\n" +
+                     "        rpcSettings {\n" +
+                     "            address(\"localhost:" + (ports + 1) + "\")\n" +
+                     "            adminAddress(\"localhost:" + (ports + 2) + "\")\n" +
+                     "        }\n" +
+                     "        rpcUsers = [[user: \"user1\", \"password\": \"test\", \"permissions\": [\"ALL\"]]]\n" +
+                     "    }\n"
+            ports += 3
+        }
+        return nodes
+    }
+
     fun generateContractFile(doc: Document, participants: MutableSet<String>, tasks: MutableSet<String>) {
-        val contractId = getValueOfNode(getElementValuesByAttributeName(doc, "choreography").item(0), "id")
-        val files = arrayOf("src/contractTemplate.txt", "src/stateTemplate.txt")
-        val subdirectory = File("./generated_contracts/" + contractId + "/")
+        var contractId = getValueOfNode(getElementValuesByAttributeName(doc, "choreography").item(0), "id")
+        contractId = contractId.replace("-", "")
+        val testing_files = File("../cordapp_template")
+        val directory = "../cordapp_" + contractId.capitalize()
+        testing_files.copyRecursively(File(directory))
+        val contractsFile = File(directory + "/contracts-kotlin/src/main/kotlin/com/generatedID")
+        contractsFile.renameTo(File(directory + "/contracts-kotlin/src/main/kotlin/com/generated" + contractId))
+        val workflowFile = File(directory + "/workflows-kotlin/src/main/kotlin/com/generatedID")
+        workflowFile.renameTo(File(directory + "/workflows-kotlin/src/main/kotlin/com/generated" + contractId))
+        val contractsDir = directory + "/contracts-kotlin/src/main/kotlin/com/generated" + contractId + "/"
+        val workflowDir = directory + "/workflows-kotlin/src/main/kotlin/com/generated" + contractId + "/flow"
+        val files = arrayOf(contractsDir + "contract/GeneratedIDContract.kt",
+                                         contractsDir + "state/GeneratedIDState.kt",
+                                         contractsDir + "schema/ID.kt",
+                                         workflowDir + "/ExampleFlow.kt",
+                                         directory + "/workflows-kotlin/build.gradle",
+                                         directory + "/contracts-kotlin/build.gradle")
         val taskNodes = getElementValuesByAttributeName(doc, "choreographyTask")
-        subdirectory.mkdirs()
         for (file in files) {
             val f = File(file)
             var text = f.readText()
-            println(text)
-            text = text.replace("ID", contractId)
+            text = text.replace("_ID_", contractId)
             text = text.replace("ParticipantA", participants.elementAt(0))
             text = text.replace("ParticipantB",participants.elementAt(1))
-            var generatingFile : File
-            if(file == "src/contractTemplate.txt"){
+            var generatingFile = File("ERROR")
+            if(file == contractsDir + "contract/GeneratedIDContract.kt"){
                 val commands = mutableSetOf<String>()
                 var commandText = "\n        class Create : Commands"
                 for (i in 0..tasks.size - 1) {
                     val command = tasks.elementAt(i)
                     val camelCaseCommand = generateCamelCaseName(command)
                     commands.add(camelCaseCommand)
-                    commandText = commandText + "\n        class " + camelCaseCommand + " : TypeOnlyCommandData(), Commands"
+                    commandText = commandText + "\n        class " + camelCaseCommand + " : Commands"
                 }
                 text = text.replace("\n        class AdditionalCommands : Commands", commandText)
-                text = text.replace("                HANDLECOMMANDS", generateStateHandling(commands))
+                text = text.replace("            HANDLECOMMANDS", generateStateHandling(commands))
                 text = text.replace("    AdditionalFunctions", generateFunctions(tasks, doc, taskNodes))
-                generatingFile = File("./generated_contracts/" + contractId + "/" + contractId + "Contract.kt")
-            } else {
-                generatingFile = File("./generated_contracts/" + contractId + "/" + contractId + "State.kt")
+                generatingFile = File(contractsDir + "contract/GeneratedIDContract.kt")
+            } else if(file == contractsDir + "state/GeneratedIDState.kt"){
+                generatingFile = File(contractsDir + "state/GeneratedIDState.kt")
+            } else if(file == contractsDir + "schema/ID.kt"){
+                text = text.replace("_INPUTS_", generateInputs(participants))
+                generatingFile = File(contractsDir + "schema/ID.kt")
+            } else if(file == workflowDir + "/ExampleFlow.kt"){
+                text = text.replace("    _CHOREOTASKS_", generateFlow(tasks, doc, taskNodes, contractId))
+                generatingFile = File(workflowDir + "/ExampleFlow.kt")
+            } else if(file == directory + "/workflows-kotlin/build.gradle") {
+                text = text.replace("partsNodes", generateNodes(participants))
+                generatingFile = File(directory + "/workflows-kotlin/build.gradle")
+            } else if(file == directory + "/contracts-kotlin/build.gradle") {
+                generatingFile = File(directory + "/contracts-kotlin/build.gradle")
             }
             generatingFile.writeText(text)
-            println(generatingFile.readText())
+            if(file == contractsDir + "contract/GeneratedIDContract.kt"){
+                generatingFile.renameTo(File(contractsDir + "contract/Generated" + contractId + "Contract.kt"))
+            }   else if(file == contractsDir + "state/GeneratedIDState.kt"){
+                generatingFile.renameTo(File(contractsDir + "state/Generated" + contractId + "State.kt"))
+            }   else if(file == contractsDir + "schema/ID.kt"){
+                generatingFile.renameTo(File(contractsDir + "schema/" + contractId + ".kt"))
+            }
         }
-
-
     }
 
 }
@@ -212,7 +427,7 @@ fun main(args: Array<String>) {
     val participantNodes = xmlReader.getElementValuesByAttributeName(doc, "participant")
     val participants = mutableSetOf<String>()
     for(i in 0..participantNodes.length - 1) {
-        val node = participantNodes.item(i);
+        val node = participantNodes.item(i)
         participants.add(xmlReader.getValueOfNode(node, "name"))
     }
     participants.forEach { e -> println(e)}
@@ -220,7 +435,7 @@ fun main(args: Array<String>) {
     val taskNodes = xmlReader.getElementValuesByAttributeName(doc, "choreographyTask")
     val tasks = mutableSetOf<String>()
     for(i in 0..taskNodes.length - 1) {
-        val node = taskNodes.item(i);
+        val node = taskNodes.item(i)
         tasks.add(xmlReader.getValueOfNode(node, "name"))
     }
     tasks.forEach { e -> println(e)}
