@@ -1,7 +1,7 @@
-package com.generatedPizza.server
+package com.generated_ID_.server
 
-import com.generatedID.flow.ExampleFlow.Initiator
-import com.generatedID.state.GeneratedPizzaState
+import com.generated_ID_.flow.ExampleFlow.*
+import com.generated_ID_.state.Generated_ID_State
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.messaging.startTrackedFlow
@@ -21,7 +21,7 @@ val SERVICE_NAMES = listOf("Notary", "Network Map Service")
  */
 
 @RestController
-@RequestMapping("/api/generatedPizza/") // The paths for GET and POST requests are relative to this base path.
+@RequestMapping("/api/generated_ID_/") // The paths for GET and POST requests are relative to this base path.
 class MainController(rpc: NodeRPCConnection) {
 
     companion object {
@@ -53,9 +53,9 @@ class MainController(rpc: NodeRPCConnection) {
     /**
      * Displays all IOU states that exist in the node's vault.
      */
-    @GetMapping(value = [ "orders" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getOrders() : ResponseEntity<List<StateAndRef<GeneratedPizzaState>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<GeneratedPizzaState>().states)
+    @GetMapping(value = [ "choreographies" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getChoreographies() : ResponseEntity<List<StateAndRef<Generated_ID_State>>> {
+        return ResponseEntity.ok(proxy.vaultQueryBy<Generated_ID_State>().states)
     }
 
     /**
@@ -70,19 +70,11 @@ class MainController(rpc: NodeRPCConnection) {
      * The flow is invoked asynchronously. It returns a future when the flow's call() method returns.
      */
 
-    @PostMapping(value = [ "create-order" ], produces = [ TEXT_PLAIN_VALUE ], headers = [ "Content-Type=application/x-www-form-urlencoded" ])
-    fun createOrder(request: HttpServletRequest): ResponseEntity<String> {
-        val pizzaAmount = request.getParameter("pizzaAmount").toInt()
-        val pizzaPrice = request.getParameter("pizzaPrice").toInt()
+    @PostMapping(value = [ "createChoreographie" ], produces = [ TEXT_PLAIN_VALUE ], headers = [ "Content-Type=application/x-www-form-urlencoded" ])
+    fun createChoreographie(request: HttpServletRequest): ResponseEntity<String> {
         val partyName = request.getParameter("partyName")
         if(partyName == null){
             return ResponseEntity.badRequest().body("Query parameter 'partyName' must not be null.\n")
-        }
-        if (pizzaAmount <= 0 ) {
-            return ResponseEntity.badRequest().body("Query parameter 'pizzaAmount' must be greater zero.\n")
-        }
-        if (pizzaPrice <= 0 ) {
-            return ResponseEntity.badRequest().body("Query parameter 'pizzaPrice' must be greater zero.\n")
         }
         val partyX500Name = CordaX500Name.parse(partyName)
         val otherParty = proxy.wellKnownPartyFromX500Name(partyX500Name) ?: return ResponseEntity.badRequest().body("Party named $partyName cannot be found.\n")
@@ -97,13 +89,15 @@ class MainController(rpc: NodeRPCConnection) {
         }
     }
 
+    _AdditionalFunctions_
+
     /**
-     * Displays all order states that only this node has been involved in.
+     * Displays all choreographie states that only this node has been involved in.
      */
-    @GetMapping(value = [ "my-orders" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getMyOrders(): ResponseEntity<List<StateAndRef<GeneratedPizzaState>>>  {
-        val myOrders = proxy.vaultQueryBy<GeneratedPizzaState>().states.filter { it.state.data.Lieferant.equals(proxy.nodeInfo().legalIdentities.first()) }
-        return ResponseEntity.ok(myOrders)
+    @GetMapping(value = [ "myChoreographies" ], produces = [ APPLICATION_JSON_VALUE ])
+    fun getMyChoreographies(): ResponseEntity<List<StateAndRef<Generated_ID_State>>>  {
+        val myChoreographies = proxy.vaultQueryBy<Generated_ID_State>().states.filter { it.state.data.Kunde.equals(proxy.nodeInfo().legalIdentities.first()) }
+        return ResponseEntity.ok(myChoreographies)
     }
 
 }

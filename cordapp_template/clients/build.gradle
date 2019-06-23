@@ -67,16 +67,6 @@ tasks.withType(KotlinCompile) {
     }
 }
 
+_runSever_
 
-task runPartyAServer(type: JavaExec, dependsOn: jar) {
-    classpath = sourceSets.main.runtimeClasspath
-    main = 'com.generatedPizza.server.ServerKt'
-    args '--server.port=50005', '--config.rpc.host=localhost', '--config.rpc.port=10005', '--config.rpc.username=user1', '--config.rpc.password=test'
-}
-
-task runPartyBServer(type: JavaExec, dependsOn: jar) {
-    classpath = sourceSets.main.runtimeClasspath
-    main = 'com.generatedPizza.server.ServerKt'
-    args '--server.port=50006', '--config.rpc.host=localhost', '--config.rpc.port=10008', '--config.rpc.username=user1', '--config.rpc.password=test'
-}
 
