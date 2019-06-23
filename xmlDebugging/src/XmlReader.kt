@@ -291,7 +291,7 @@ open class XmlReader(private val xmlPath : String) {
                     "            // Stage 1.\n" +
                     "            progressTracker.currentStep = GENERATING_TRANSACTION\n" +
                     "            // Generate an unsigned transaction.\n" +
-                    "            val " + contractId + "State = Generated" + contractId + "State(serviceHub.myInfo.legalIdentities.first(), otherParty, 0)\n" +
+                    "            val " + contractId + "State = Generated" + contractId + "State(serviceHub.myInfo.legalIdentities.first(), otherParty, " + (i + 1) + ")\n" +
                     "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + camelCaseCommand.capitalize() + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
                     "            val txBuilder = TransactionBuilder(notary)\n" +
                     "                    .addOutputState(pizzaState, Generated" + contractId + "Contract.ID)\n" +
