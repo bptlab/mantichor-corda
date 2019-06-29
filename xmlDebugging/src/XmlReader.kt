@@ -44,18 +44,18 @@ open class XmlReader(private val xmlPath : String) {
 
     fun generateChoreoTaskOrder(doc: Document) : ArrayList<Node> {
         val choreo = ArrayList<Node>()
-        val taskNodes = getElementValuesByAttributeName(doc, "choreographyTask")
-        val sequenceFlows = getElementValuesByAttributeName(doc, "sequenceFlow")
-        val endNodes = getElementValuesByAttributeName(doc, "endEvent")
-        val startNode = getElementValuesByAttributeName(doc, "startEvent").item(0)
-        var outgoingNode = getChildNodeByName(startNode, "outgoing")
+        val taskNodes = getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
+        val sequenceFlows = getElementValuesByAttributeName(doc, "bpmn2:sequenceFlow")
+        val endNodes = getElementValuesByAttributeName(doc, "bpmn2:endEvent")
+        val startNode = getElementValuesByAttributeName(doc, "bpmn2:startEvent").item(0)
+        var outgoingNode = getChildNodeByName(startNode, "bpmn2:outgoing")
         choreo.add(startNode)
         var sequenceFlow = getNodeById(sequenceFlows, outgoingNode!!.textContent)
         while(getNodeById(taskNodes, getValueOfNode(sequenceFlow!!, "targetRef")) != null) {
             val nextNode = getNodeById(taskNodes, getValueOfNode(sequenceFlow, "targetRef"))
             choreo.add(nextNode!!)
             println(getValueOfNode(nextNode, "name"))
-            outgoingNode = getChildNodeByName(nextNode, "outgoing")
+            outgoingNode = getChildNodeByName(nextNode, "bpmn2:outgoing")
             sequenceFlow = getNodeById(sequenceFlows, outgoingNode!!.textContent)
         }
         if(getNodeById(endNodes, getValueOfNode(sequenceFlow, "targetRef")) != null){
@@ -74,7 +74,7 @@ open class XmlReader(private val xmlPath : String) {
     }
 
     fun getInitParticipantForTasks(doc: Document, choreoTasks: ArrayList<Node>) : ArrayList<Node> {
-        val participantNodes = getElementValuesByAttributeName(doc, "participant")
+        val participantNodes = getElementValuesByAttributeName(doc, "bpmn2:participant")
         val initParticipants = ArrayList<Node>()
         for(i in 1..choreoTasks.size - 2){
             val participant = getInitParticipantForTask(choreoTasks.get(i), participantNodes)
@@ -144,7 +144,7 @@ open class XmlReader(private val xmlPath : String) {
         val childs = node.childNodes
 
         for(i in 0..childs.length -1) {
-            if(childs.item(i).nodeName == "participantRef") {
+            if(childs.item(i).nodeName == "bpmn2:participantRef") {
                 partsIDs.add(childs.item(i).textContent)
             }
         }
@@ -178,7 +178,7 @@ open class XmlReader(private val xmlPath : String) {
 
     fun generateFlow(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String) : String {
         var flow = ""
-        val participants = getElementValuesByAttributeName(doc, "participant")
+        val participants = getElementValuesByAttributeName(doc, "bpmn2:participant")
         flow += "    @InitiatingFlow\n" +
                 "    @StartableByRPC\n" +
                 "    class " + "Initiator" + "(val otherParty: Party) : FlowLogic<SignedTransaction>() {\n"
@@ -358,7 +358,7 @@ open class XmlReader(private val xmlPath : String) {
 
     fun generateRPCConnection(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String) : String {
         var rpcConnection = ""
-        val participants = getElementValuesByAttributeName(doc, "participant")
+        val participants = getElementValuesByAttributeName(doc, "bpmn2:participant")
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
             val parts = crawlChilds(correspondingNode, participants)
@@ -402,7 +402,7 @@ open class XmlReader(private val xmlPath : String) {
     }
 
     fun generateContractFile(doc: Document, participants: MutableSet<String>, tasks: MutableSet<String>) {
-        var contractId = getValueOfNode(getElementValuesByAttributeName(doc, "choreography").item(0), "id")
+        var contractId = getValueOfNode(getElementValuesByAttributeName(doc, "bpmn2:choreography").item(0), "id")
         contractId = contractId.replace("-", "")
         val testing_files = File("../cordapp_template")
         val directory = "../cordapp_" + contractId.capitalize()
@@ -426,7 +426,7 @@ open class XmlReader(private val xmlPath : String) {
                                          serverDir + "/NodeRPCConnection.kt",
                                          serverDir + "/Server.kt",
                                          directory + "/clients/build.gradle")
-        val taskNodes = getElementValuesByAttributeName(doc, "choreographyTask")
+        val taskNodes = getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
         for (file in files) {
             val f = File(file)
             var text = f.readText()
@@ -484,9 +484,9 @@ open class XmlReader(private val xmlPath : String) {
 
 }
 fun main(args: Array<String>) {
-    val xmlReader = XmlReader("src/Pizza-Choreo_simple.bpmn")
+    val xmlReader = XmlReader("src/sequence.bpmn")
     val doc = xmlReader.readXml()
-    val participantNodes = xmlReader.getElementValuesByAttributeName(doc, "participant")
+    val participantNodes = xmlReader.getElementValuesByAttributeName(doc, "bpmn2:participant")
     val participants = mutableSetOf<String>()
     for(i in 0..participantNodes.length - 1) {
         val node = participantNodes.item(i)
@@ -494,27 +494,14 @@ fun main(args: Array<String>) {
     }
     participants.forEach { e -> println(e)}
 
-    val taskNodes = xmlReader.getElementValuesByAttributeName(doc, "choreographyTask")
+    val taskNodes = xmlReader.getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
     val tasks = mutableSetOf<String>()
     for(i in 0..taskNodes.length - 1) {
         val node = taskNodes.item(i)
         tasks.add(xmlReader.getValueOfNode(node, "name"))
     }
     tasks.forEach { e -> println(e)}
-    val foundNode = xmlReader.getNodeById(taskNodes, "sid-99ABCD46-49C9-4AD1-94B2-788BA9ACA06A")
-    if(foundNode != null) {
-        println(xmlReader.getValueOfNode(foundNode, "name"))
-    }
+
     println()
-    val choreoTasks = xmlReader.generateChoreoTaskOrder(doc)
-    val initParticipants = xmlReader.getInitParticipantForTasks(doc, choreoTasks)
-    val messages = ArrayList<String>()
-    for(i in 0..initParticipants.size - 1){
-        val extensionElement = xmlReader.getChildNodeByName(initParticipants.get(i), "extensionElements")
-        val messageNode = xmlReader.getChildNodeByName(extensionElement!!, "signavio:signavioMessageName")
-        val message = xmlReader.getValueOfNode(messageNode!!, "name")
-        println(message)
-        messages.add(message)
-    }
     xmlReader.generateContractFile(doc, participants, tasks)
 }
