@@ -4,6 +4,7 @@ import org.w3c.dom.Node
 import org.w3c.dom.NodeList
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
+import kotlin.contracts.contract
 
 open class XmlReader(private val xmlPath : String) {
 
@@ -201,7 +202,8 @@ open class XmlReader(private val xmlPath : String) {
                 "                    GATHERING_SIGS,\n" +
                 "                    FINALISING_TRANSACTION\n" +
                 "            )\n" +
-                "        }\n"
+                "        }\n\n" +
+                "        override val progressTracker = tracker()\n\n"
         flow += "        @Suspendable\n" +
                 "        override fun call(): SignedTransaction {\n" +
                 "            // Obtain a reference to the notary we want to use.\n" +
@@ -213,7 +215,7 @@ open class XmlReader(private val xmlPath : String) {
                 "            val " + contractId + "State = Generated" + contractId + "State(serviceHub.myInfo.legalIdentities.first(), otherParty, 0)\n" +
                 "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + "Create" + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
                 "            val txBuilder = TransactionBuilder(notary)\n" +
-                "                    .addOutputState(pizzaState, Generated" + contractId + "Contract.ID)\n" +
+                "                    .addOutputState(" + contractId + "State, Generated" + contractId + "Contract.ID)\n" +
                 "                    .addCommand(txCommand)\n" +
                 "\n" +
                 "            // Stage 2.\n" +
@@ -282,7 +284,8 @@ open class XmlReader(private val xmlPath : String) {
                     "                    GATHERING_SIGS,\n" +
                     "                    FINALISING_TRANSACTION\n" +
                     "            )\n" +
-                    "        }\n"
+                    "        }\n\n" +
+                    "        override val progressTracker = tracker()\n\n"
             flow += "        @Suspendable\n" +
                     "        override fun call(): SignedTransaction {\n" +
                     "            // Obtain a reference to the notary we want to use.\n" +
@@ -294,7 +297,7 @@ open class XmlReader(private val xmlPath : String) {
                     "            val " + contractId + "State = Generated" + contractId + "State(serviceHub.myInfo.legalIdentities.first(), otherParty, " + (i + 1) + ")\n" +
                     "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + camelCaseCommand.capitalize() + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
                     "            val txBuilder = TransactionBuilder(notary)\n" +
-                    "                    .addOutputState(pizzaState, Generated" + contractId + "Contract.ID)\n" +
+                    "                    .addOutputState(" + contractId + "State, Generated" + contractId + "Contract.ID)\n" +
                     "                    .addCommand(txCommand)\n" +
                     "\n" +
                     "            // Stage 2.\n" +
@@ -356,7 +359,21 @@ open class XmlReader(private val xmlPath : String) {
         return nodes
     }
 
-    fun generateRPCConnection(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String) : String {
+    fun generateFlowImport(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String) : String {
+        var imports = ""
+        val participants = getElementValuesByAttributeName(doc, "participant")
+        for(i in 0..tasks.size - 1) {
+            val correspondingNode = nodeTasks.item(i)
+            val parts = crawlChilds(correspondingNode, participants)
+            val command = tasks.elementAt(i)
+            val camelCaseCommand = generateCamelCaseName(command)
+            val initFlow = parts.elementAt(0) + camelCaseCommand.capitalize() + "Flow"
+            imports += "import com.generated" + contractId + ".flow.ExampleFlow." + initFlow + "\n"
+        }
+        return imports
+    }
+
+    fun generateRPCConnection(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList) : String {
         var rpcConnection = ""
         val participants = getElementValuesByAttributeName(doc, "participant")
         for(i in 0..tasks.size - 1) {
@@ -387,18 +404,29 @@ open class XmlReader(private val xmlPath : String) {
         return rpcConnection
     }
 
-    fun serverBuild(participants: MutableSet<String>) : String {
+    fun serverBuild(participants: MutableSet<String>, contractId: String) : String {
         var build = ""
         var ports = 5
         for(i in 0..participants.size-1) {
             build += "task run" + participants.elementAt(i) + "Server(type: JavaExec, dependsOn: jar) {\n" +
                     "    classpath = sourceSets.main.runtimeClasspath\n" +
-                    "    main = 'com.generatedPizza.server.ServerKt'\n" +
+                    "    main = 'com.generated" + contractId + ".server.ServerKt'\n" +
                     "    args '--server.port=" + (ports + 50000) + "', '--config.rpc.host=localhost', '--config.rpc.port=" + (ports + 10000) + "', '--config.rpc.username=user1', '--config.rpc.password=test'\n" +
                     "}\n\n"
             ports += 3
         }
         return build
+    }
+
+    fun generateTables(participants: MutableSet<String>) : String {
+        var tables = ""
+        for(i in 0..participants.size-1) {
+            tables += "            @Column(name = \"" + participants.elementAt(i) + "\")\n" +
+                    "            var " + participants.elementAt(i) + ": String,\n\n"
+        }
+        tables += "            @Column(name = \"stateEnum\")\n" +
+                "            var stateEnum: String,\n\n"
+        return tables
     }
 
     fun generateContractFile(doc: Document, participants: MutableSet<String>, tasks: MutableSet<String>) {
@@ -425,7 +453,8 @@ open class XmlReader(private val xmlPath : String) {
                                          serverDir + "/MainController.kt",
                                          serverDir + "/NodeRPCConnection.kt",
                                          serverDir + "/Server.kt",
-                                         directory + "/clients/build.gradle")
+                                         directory + "/clients/build.gradle",
+                                         directory + "/gradle.properties")
         val taskNodes = getElementValuesByAttributeName(doc, "choreographyTask")
         for (file in files) {
             val f = File(file)
@@ -451,6 +480,7 @@ open class XmlReader(private val xmlPath : String) {
                 generatingFile = File(contractsDir + "state/GeneratedIDState.kt")
             } else if(file == contractsDir + "schema/ID.kt"){
                 text = text.replace("_INPUTS_", generateInputs(participants))
+                text = text.replace("tables", generateTables(participants))
                 generatingFile = File(contractsDir + "schema/ID.kt")
             } else if(file == workflowDir + "/ExampleFlow.kt"){
                 text = text.replace("    _CHOREOTASKS_", generateFlow(tasks, doc, taskNodes, contractId))
@@ -461,15 +491,18 @@ open class XmlReader(private val xmlPath : String) {
             } else if(file == directory + "/contracts-kotlin/build.gradle") {
                 generatingFile = File(directory + "/contracts-kotlin/build.gradle")
             } else if(file == serverDir + "/MainController.kt"){
-                text = text.replace("_AdditionalFunctions_", generateRPCConnection(tasks, doc, taskNodes, contractId))
+                text = text.replace("_AdditionalFunctions_", generateRPCConnection(tasks, doc, taskNodes))
+                text = text.replace("_FLOWS_", generateFlowImport(tasks, doc, taskNodes, contractId))
                 generatingFile = File(serverDir + "/MainController.kt")
             } else if(file == serverDir + "/NodeRPCConnection.kt"){
                 generatingFile = File(serverDir + "/NodeRPCConnection.kt")
             } else if(file == serverDir + "/Server.kt"){
                 generatingFile = File(serverDir + "/Server.kt")
             } else if(file == directory + "/clients/build.gradle") {
-                text = text.replace("_runSever_", serverBuild(participants))
+                text = text.replace("_runSever_", serverBuild(participants, contractId))
                 generatingFile = File(directory + "/clients/build.gradle")
+            } else if(file == directory + "/gradle.properties") {
+                generatingFile = File(directory + "/gradle.properties")
             }
             generatingFile.writeText(text)
             if(file == contractsDir + "contract/GeneratedIDContract.kt"){

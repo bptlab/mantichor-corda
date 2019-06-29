@@ -22,6 +22,6 @@ object _ID_V1 : MappedSchema(
     var linearId: UUID
     ) : PersistentState() {
         // Default constructor required by hibernate.
-        constructor(): this(_INPUTS_, UUID.randomUUID())
+        constructor(): this(_INPUTS_"", UUID.randomUUID())
     }
 }

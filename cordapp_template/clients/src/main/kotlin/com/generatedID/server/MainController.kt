@@ -1,6 +1,7 @@
 package com.generated_ID_.server
 
-import com.generated_ID_.flow.ExampleFlow.*
+import com.generated_ID_.flow.ExampleFlow.Initiator
+_FLOWS_
 import com.generated_ID_.state.Generated_ID_State
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.identity.CordaX500Name

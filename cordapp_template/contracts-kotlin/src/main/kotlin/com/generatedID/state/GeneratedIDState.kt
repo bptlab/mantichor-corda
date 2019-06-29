@@ -1,6 +1,6 @@
 package com.generated_ID_.state
 
-import com.generated_ID_.contract._ID_Contract
+import com.generated_ID_.contract.Generated_ID_Contract
 import com.generated_ID_.schema._ID_V1
 import net.corda.core.contracts.BelongsToContract
 import net.corda.core.contracts.LinearState
@@ -8,8 +8,10 @@ import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.schemas.QueryableState
+import net.corda.core.schemas.MappedSchema
+import net.corda.core.schemas.PersistentState
 
-@BelongsToContract(_ID_Contract::class)
+@BelongsToContract(Generated_ID_Contract::class)
 data class Generated_ID_State( val ParticipantA: Party,
                                val ParticipantB: Party,
                                val stateEnum: Int,
