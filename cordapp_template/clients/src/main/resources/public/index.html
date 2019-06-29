@@ -21,12 +21,12 @@
         <div class="navbar-header">
             <a class="navbar-brand" href="#">{{demoApp.thisNode}}</a>
         </div>
-        <button ng-click="demoApp.openModal()" type="button" class="btn btn-primary navbar-btn">Create Order</button>
+        <button ng-click="demoApp.openModal()" type="button" class="btn btn-primary navbar-btn">Change State</button>
     </div>
 </nav>
 <script type="text/ng-template" id="demoAppModal.html">
     <div class="modal-header">
-        <h4 class="modal-title">Add new Order</h4>
+        <h4 class="modal-title">Add new State</h4>
     </div>
     <form>
         <div class="modal-body">
@@ -37,12 +37,8 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="menge" class="control-label">Menge (Int):</label>
-                <input type="text" ng-model="modalInstance.form.menge" class="form-control" id="menge">
-            </div>
-            <div class="form-group">
-                <label for="preis" class="control-label">Preis (Int):</label>
-                <input type="text" ng-model="modalInstance.form.preis" class="form-control" id="preis">
+                <label for="stateEnum" class="control-label">StateEnum (Int):</label>
+                <input type="text" ng-model="modalInstance.form.stateEnum" class="form-control" id="stateEnum">
             </div>
             <div ng-show="modalInstance.formError" class="form-group">
                 <div class="alert alert-danger" role="alert">
@@ -54,7 +50,7 @@
         </div>
         <div class="modal-footer">
             <button ng-click="modalInstance.cancel()" type="button" class="btn btn-default">Close</button>
-            <button ng-click="modalInstance.create()" type="button" class="btn btn-primary">Create Order</button>
+            <button ng-click="modalInstance.create()" type="button" class="btn btn-primary">Change State</button>
         </div>
     </form>
 </script>
@@ -83,8 +79,7 @@
                             <ul>
                                 <li>Lieferer: {{order.lieferer}}</li>
                                 <li>Kunde: {{order.kunde}}</li>
-                                <li>Menge: {{oder.menge}}</li>
-                                <li>Preis: {{order.preis}}</li>
+                                <li>State: {{oder.stateEnum}}</li>
                             </ul>
                         </div>
                     </div>
@@ -104,8 +99,7 @@
                             <ul>
                                 <li>Lieferer: {{order.lieferer}}</li>
                                 <li>Kunde: {{order.kunde}}</li>
-                                <li>Menge: {{oder.menge}}</li>
-                                <li>Preis: {{order.preis}}</li>
+                                <li>State: {{oder.stateEnum}}</li>
                             </ul>
                         </div>
                     </div>

@@ -10,7 +10,7 @@ app.config(['$qProvider', function ($qProvider) {
 app.controller('DemoAppController', function($http, $location, $uibModal) {
     const demoApp = this;
 
-    const apiBaseURL = "/api/example/";
+    const apiBaseURL = "/api/generatedside0f05a461e7046c68790a3249a304714/";
     let peers = [];
 
     $http.get(apiBaseURL + "me").then((response) => demoApp.thisNode = response.data.me);
@@ -55,33 +55,40 @@ app.controller('ModalInstanceCtrl', function ($http, $location, $uibModalInstanc
 
         // Validates and sends Orders.
         modalInstance.create = function validateAndSendOrder() {
-            if (modalInstance.form.menge <= 0 || modalInstance.form.preis <= 0) {
-                modalInstance.formError = true;
-            } else {
-                modalInstance.formError = false;
-                $uibModalInstance.close();
+            modalInstance.formError = false;
+            $uibModalInstance.close();
 
-                let CREATE_ORDERS_PATH = apiBaseURL + "create-order"
-
-                let createOrderData = $.param({
-                    partyName: modalInstance.form.counterparty,
-                    pizzaAmount : modalInstance.form.menge,
-                    pizzaPrice : modalInstance.form.preis
-
-                });
-
-                let createOrderHeaders = {
-                    headers : {
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    }
-                };
-
-                // Create order  and handles success / fail responses.
-                $http.post(CREATE_ORDERS_PATH, createOrderData, createOrderHeaders).then(
-                    modalInstance.displayMessage,
-                    modalInstance.displayMessage
-                );
+            let command = apiBaseURL;
+            switch(parseFloat(modalInstance.form.stateEnum)) {
+                case 0:
+                    command += "createChoreographie";
+                    break
+                case 1:
+                    command += "PizzaBestellen";
+                    break
+                case 2:
+                    command += "PizzaLiefern";
+                    break;
+                case 3:
+                    command += "GeldKassieren";
+                    break;
             }
+
+            let commandData = $.param({
+                partyName: modalInstance.form.counterparty
+            });
+
+            let commandHeaders = {
+                headers : {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+            };
+
+            // Create order  and handles success / fail responses.
+            $http.post(command, commandData, commandHeaders).then(
+                modalInstance.displayMessage,
+                modalInstance.displayMessage
+            );
         };
 
     modalInstance.displayMessage = (message) => {
