@@ -6,3 +6,6 @@
 **/logs
 **/out
 generated_contracts/
+private/
+**/production
+**/cordapp_S*
