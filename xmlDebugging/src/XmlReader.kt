@@ -123,12 +123,66 @@ open class XmlReader(private val xmlPath : String) {
         return inputs
     }
 
-    fun generateFlow(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String) : String {
+    fun generateInputList(participants: MutableSet<String>, position: Int) : String {
+        var list = ""
+        for(i in 0..participants.size-1) {
+            if(position != i) {
+                list += "val otherParty" + i + ": Party"
+            }
+        }
+        return list
+    }
+
+    fun generateOutputList(participants: MutableSet<String>, position: Int) : String {
+        var list = ""
+        for(i in 0..participants.size-1) {
+            if(position != i) {
+                list +="            val otherPartySession" + i + " = initiateFlow(otherParty" + i + ")\n"
+            }
+        }
+        return list
+    }
+
+    fun generateSessionsList(participants: MutableSet<String>, position: Int) : String {
+        var list = ""
+        for(i in 0..participants.size-1) {
+            if(position != i) {
+                list +="otherPartySession" + i
+                if(i < participants.size-1 && !(i + 1 == participants.size-1 && participants.size-1 == position)){
+                    list += ", "
+                }
+            }
+        }
+        return list
+    }
+
+    fun getInitPosition(participants: MutableSet<String>, initPart: String) : Int {
+        for(i in 0..participants.size -1) {
+            if(initPart == participants.elementAt(i)) {
+                return i
+            }
+        }
+        return -1
+    }
+
+    fun generateWorkflowStateInput(participants: MutableSet<String>, position: Int) : String {
+        var input = ""
+        for(i in 0..participants.size - 1) {
+            if(i == position) {
+                input += "serviceHub.myInfo.legalIdentities.first(), "
+            } else {
+                input += "otherParty" + i + ", "
+            }
+        }
+        return input
+    }
+
+    fun generateFlow(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String, participantsSet: MutableSet<String>) : String {
         var flow = ""
         val participants = getElementValuesByAttributeName(doc, "participant")
         flow += "    @InitiatingFlow\n" +
                 "    @StartableByRPC\n" +
-                "    class " + "Initiator" + "(val otherParty: Party) : FlowLogic<SignedTransaction>() {\n"
+                "    class " + "Initiator" + "(" + generateInputList(participantsSet, 0) + ") : FlowLogic<SignedTransaction>() {\n"
         flow += "        companion object {\n" +
                 "            object GENERATING_TRANSACTION : Step(\"Generating transaction based on new Input.\")\n" +
                 "            object VERIFYING_TRANSACTION : Step(\"Verifying contract constraints.\")\n" +
@@ -158,7 +212,7 @@ open class XmlReader(private val xmlPath : String) {
                 "            // Stage 1.\n" +
                 "            progressTracker.currentStep = GENERATING_TRANSACTION\n" +
                 "            // Generate an unsigned transaction.\n" +
-                "            val " + contractId + "State = Generated" + contractId + "State(serviceHub.myInfo.legalIdentities.first(), otherParty, 0)\n" +
+                "            val " + contractId + "State = Generated" + contractId + "State(" + generateWorkflowStateInput(participantsSet, 0) + "0)\n" +
                 "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + "Create" + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
                 "            val txBuilder = TransactionBuilder(notary)\n" +
                 "                    .addOutputState(" + contractId + "State, Generated" + contractId + "Contract.ID)\n" +
@@ -176,14 +230,14 @@ open class XmlReader(private val xmlPath : String) {
                 "\n" +
                 "            // Stage 4.\n" +
                 "            progressTracker.currentStep = GATHERING_SIGS\n" +
-                "            // Send the state to the counterparty, and receive it back with their signature.\n" +
-                "            val otherPartySession = initiateFlow(otherParty)\n" +
-                "            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(otherPartySession), GATHERING_SIGS.childProgressTracker()))\n" +
+                "            // Send the state to the counterparties, and receive it back with their signatures.\n" +
+                generateOutputList(participantsSet, 0) +
+                "            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(" + generateSessionsList(participantsSet, 0) + "), GATHERING_SIGS.childProgressTracker()))\n" +
                 "\n" +
                 "            // Stage 5.\n" +
                 "            progressTracker.currentStep = FINALISING_TRANSACTION\n" +
-                "            // Notarise and record the transaction in both parties' vaults.\n" +
-                "            return subFlow(FinalityFlow(fullySignedTx, setOf(otherPartySession), FINALISING_TRANSACTION.childProgressTracker()))\n" +
+                "            // Notarise and record the transaction in all parties' vaults.\n" +
+                "            return subFlow(FinalityFlow(fullySignedTx, setOf(" + generateSessionsList(participantsSet, 0) + "), FINALISING_TRANSACTION.childProgressTracker()))\n" +
                 "        }\n" +
                 "    }\n"
         flow += "    @InitiatedBy(" + "Initiator"+ "::class)\n" +
@@ -207,14 +261,11 @@ open class XmlReader(private val xmlPath : String) {
             val command = tasks.elementAt(i)
             val camelCaseCommand = generateCamelCaseName(command)
             val initFlow = parts.elementAt(0) + camelCaseCommand.capitalize() + "Flow"
-            val reactingFlow = parts.elementAt(1) + camelCaseCommand.capitalize() + "Flow"
-            var position = 0
-            if(parts.elementAt(0) == getValueOfNode(participants.item(1), "name")){
-                position = 1
-            }
+            val reactingFlow = "reaction" + camelCaseCommand.capitalize() + "Flow"
+            val position = getInitPosition(participantsSet, parts.elementAt(0))
             flow += "    @InitiatingFlow\n" +
                     "    @StartableByRPC\n" +
-                    "    class " + initFlow + "(val otherParty: Party) : FlowLogic<SignedTransaction>() {\n"
+                    "    class " + initFlow + "(" + generateInputList(participantsSet, position) + ") : FlowLogic<SignedTransaction>() {\n"
             flow += "        companion object {\n" +
                     "            object GENERATING_TRANSACTION : Step(\"Generating transaction based on new Input.\")\n" +
                     "            object VERIFYING_TRANSACTION : Step(\"Verifying contract constraints.\")\n" +
@@ -244,11 +295,7 @@ open class XmlReader(private val xmlPath : String) {
                     "            // Stage 1.\n" +
                     "            progressTracker.currentStep = GENERATING_TRANSACTION\n" +
                     "            // Generate an unsigned transaction.\n"
-            if(position == 0) {
-                flow += "            val " + contractId + "State = Generated" + contractId + "State(serviceHub.myInfo.legalIdentities.first(), otherParty, " + (i + 1) + ")\n"
-            } else {
-                flow += "            val " + contractId + "State = Generated" + contractId + "State(otherParty, serviceHub.myInfo.legalIdentities.first(), " + (i + 1) + ")\n"
-            }
+            flow += "            val " + contractId + "State = Generated" + contractId + "State(" + generateWorkflowStateInput(participantsSet, position) + (i + 1) + ")\n"
             flow += "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + camelCaseCommand.capitalize() + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
                     "            val txBuilder = TransactionBuilder(notary)\n" +
                     "                    .addOutputState(" + contractId + "State, Generated" + contractId + "Contract.ID)\n" +
@@ -270,14 +317,14 @@ open class XmlReader(private val xmlPath : String) {
                     "\n" +
                     "            // Stage 4.\n" +
                     "            progressTracker.currentStep = GATHERING_SIGS\n" +
-                    "            // Send the state to the counterparty, and receive it back with their signature.\n" +
-                    "            val otherPartySession = initiateFlow(otherParty)\n" +
-                    "            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(otherPartySession), GATHERING_SIGS.childProgressTracker()))\n" +
+                    "            // Send the state to the counterparties, and receive it back with their signatures.\n" +
+                    generateOutputList(participantsSet, position) +
+                    "            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(" + generateSessionsList(participantsSet, position) + "), GATHERING_SIGS.childProgressTracker()))\n" +
                     "\n" +
                     "            // Stage 5.\n" +
                     "            progressTracker.currentStep = FINALISING_TRANSACTION\n" +
-                    "            // Notarise and record the transaction in both parties' vaults.\n" +
-                    "            return subFlow(FinalityFlow(fullySignedTx, setOf(otherPartySession), FINALISING_TRANSACTION.childProgressTracker()))\n" +
+                    "            // Notarise and record the transaction in all parties' vaults.\n" +
+                    "            return subFlow(FinalityFlow(fullySignedTx, setOf(" + generateSessionsList(participantsSet, position) + "), FINALISING_TRANSACTION.childProgressTracker()))\n" +
                     "        }\n" +
                     "    }\n"
             flow += "    @InitiatedBy(" + initFlow + "::class)\n" +
@@ -288,8 +335,6 @@ open class XmlReader(private val xmlPath : String) {
                     "                override fun checkTransaction(stx: SignedTransaction) = requireThat {\n" +
                     "                    val output = stx.tx.outputs.single().data\n" +
                     "                    \"This must be a valid transaction.\" using (output is Generated" + contractId + "State)\n" +
-                    "                    \"only " + parts.elementAt(1).capitalize() + " can handle this call\" using(serviceHub.myInfo." +
-                    "legalIdentities.first().name.organisation == \"" + parts.elementAt(1) + "\")\n" +
                     "                }\n" +
                     "            }\n" +
                     "            val txId = subFlow(signTransactionFlow).id\n" +
@@ -297,7 +342,7 @@ open class XmlReader(private val xmlPath : String) {
                     "            return subFlow(ReceiveFinalityFlow(otherPartySession, expectedTxId = txId))\n" +
                     "        }\n" +
                     "    }\n"
-            }
+        }
         return flow
     }
 
@@ -389,6 +434,45 @@ open class XmlReader(private val xmlPath : String) {
         return tables
     }
 
+    fun generateCommands(tasks: MutableSet<String>) :String {
+        val commands = mutableSetOf<String>()
+        var commandText = "\n        class Create : Commands"
+        for (i in 0..tasks.size - 1) {
+            val command = tasks.elementAt(i)
+            val camelCaseCommand = generateCamelCaseName(command)
+            commands.add(camelCaseCommand)
+            commandText = commandText + "\n        class " + camelCaseCommand + " : Commands"
+        }
+        return commandText;
+    }
+
+    fun generateStateList(participants: MutableSet<String>) : String {
+        var list = ""
+        for(i in 0..participants.size-1) {
+            list += participants.elementAt(i)
+            if(i < participants.size-1) {
+                list += ", "
+            }
+        }
+        return list
+    }
+
+    fun generateStateParams(participants: MutableSet<String>) : String {
+        var params = ""
+        for(i in 0..participants.size-1) {
+            params += "val " + participants.elementAt(i) + ": Party,\n                               "
+        }
+        return params
+    }
+
+    fun generateStateSchema(participants: MutableSet<String>) : String {
+        var schemaParams = ""
+        for(i in 0..participants.size-1) {
+            schemaParams += "this." + participants.elementAt(i) + ".name.toString(),\n                    "
+        }
+        return schemaParams
+    }
+
     fun generateContractFile(doc: Document, participants: MutableSet<String>, tasks: MutableSet<String>) {
         var contractId = getValueOfNode(getElementValuesByAttributeName(doc, "choreography").item(0), "id")
         contractId = contractId.replace("-", "")
@@ -425,24 +509,19 @@ open class XmlReader(private val xmlPath : String) {
             var generatingFile = File("ERROR")
             //TO-DO: Refactor to switch case
             if(file == contractsDir + "contract/GeneratedIDContract.kt"){
-                val commands = mutableSetOf<String>()
-                var commandText = "\n        class Create : Commands"
-                for (i in 0..tasks.size - 1) {
-                    val command = tasks.elementAt(i)
-                    val camelCaseCommand = generateCamelCaseName(command)
-                    commands.add(camelCaseCommand)
-                    commandText = commandText + "\n        class " + camelCaseCommand + " : Commands"
-                }
-                text = text.replace("\n        class AdditionalCommands : Commands", commandText)
+                text = text.replace("\n        class AdditionalCommands : Commands", generateCommands(tasks))
                 generatingFile = File(contractsDir + "contract/GeneratedIDContract.kt")
             } else if(file == contractsDir + "state/GeneratedIDState.kt"){
+                text = text.replace("PARTSINPUT", generateStateParams(participants))
+                text = text.replace("PARTSLIST", generateStateList(participants))
+                text = text.replace("SCHEMAINPUT", generateStateSchema(participants))
                 generatingFile = File(contractsDir + "state/GeneratedIDState.kt")
             } else if(file == contractsDir + "schema/ID.kt"){
                 text = text.replace("_INPUTS_", generateInputs(participants))
                 text = text.replace("tables", generateTables(participants))
                 generatingFile = File(contractsDir + "schema/ID.kt")
             } else if(file == workflowDir + "/ExampleFlow.kt"){
-                text = text.replace("    _CHOREOTASKS_", generateFlow(tasks, doc, taskNodes, contractId))
+                text = text.replace("    _CHOREOTASKS_", generateFlow(tasks, doc, taskNodes, contractId, participants))
                 generatingFile = File(workflowDir + "/ExampleFlow.kt")
             } else if(file == directory + "/workflows-kotlin/build.gradle") {
                 text = text.replace("partsNodes", generateNodes(participants))
@@ -479,7 +558,7 @@ open class XmlReader(private val xmlPath : String) {
 //TO-DO: get rid of unnessassary calls
 //       refactor into multiple functions to reduce code duplication
 fun main(args: Array<String>) {
-    val xmlReader = XmlReader("src/Pizza-Choreo_simple.bpmn")
+    val xmlReader = XmlReader("./src/Pizza-Choreo_simple.bpmn")
     val doc = xmlReader.readXml()
     val participantNodes = xmlReader.getElementValuesByAttributeName(doc, "participant")
     val participants = mutableSetOf<String>()

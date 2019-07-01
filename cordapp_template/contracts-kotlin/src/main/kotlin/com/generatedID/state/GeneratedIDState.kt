@@ -12,19 +12,15 @@ import net.corda.core.schemas.MappedSchema
 import net.corda.core.schemas.PersistentState
 
 @BelongsToContract(Generated_ID_Contract::class)
-data class Generated_ID_State( val ParticipantA: Party,
-                               val ParticipantB: Party,
-                               val stateEnum: Int,
+data class Generated_ID_State( PARTSINPUTval stateEnum: Int,
                                override val linearId: UniqueIdentifier = UniqueIdentifier()):
         LinearState, QueryableState {
     /** The public keys of the involved parties. */
-    override val participants: List<AbstractParty> get() = listOf(ParticipantA, ParticipantB)
+    override val participants: List<AbstractParty> get() = listOf(PARTSLIST)
     override fun generateMappedObject(schema: MappedSchema): PersistentState {
         return when (schema) {
             is _ID_V1 -> _ID_V1.Persistent_ID_(
-                    this.ParticipantA.name.toString(),
-                    this.ParticipantB.name.toString(),
-                    this.stateEnum.toString(),
+                    SCHEMAINPUTthis.stateEnum.toString(),
                     this.linearId.id
             )
             else -> throw IllegalArgumentException("Unrecognised schema $schema")
