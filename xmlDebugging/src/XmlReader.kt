@@ -1,10 +1,8 @@
-
 import org.w3c.dom.Document
 import org.w3c.dom.Node
 import org.w3c.dom.NodeList
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
-import kotlin.contracts.contract
 
 open class XmlReader(private val xmlPath : String) {
 
@@ -23,73 +21,10 @@ open class XmlReader(private val xmlPath : String) {
         return node.attributes.getNamedItem(valueName).nodeValue
     }
 
-    fun getNodeById(list: NodeList, id: String) : Node? {
-        for(i in 0..list.length-1) {
-            val node = list.item(i)
-            if(getValueOfNode(node, "id") == id){
-                return node
-            }
-        }
-        return null
-    }
-
-    fun getChildNodeByName(node: Node, name: String) : Node? {
-        val childs = node.childNodes
-        for(i in 0..childs.length -1) {
-            if(childs.item(i).nodeName == name) {
-                return childs.item(i)
-            }
-        }
-        return null
-    }
-
-    fun generateChoreoTaskOrder(doc: Document) : ArrayList<Node> {
-        val choreo = ArrayList<Node>()
-        val taskNodes = getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
-        val sequenceFlows = getElementValuesByAttributeName(doc, "bpmn2:sequenceFlow")
-        val endNodes = getElementValuesByAttributeName(doc, "bpmn2:endEvent")
-        val startNode = getElementValuesByAttributeName(doc, "bpmn2:startEvent").item(0)
-        var outgoingNode = getChildNodeByName(startNode, "bpmn2:outgoing")
-        choreo.add(startNode)
-        var sequenceFlow = getNodeById(sequenceFlows, outgoingNode!!.textContent)
-        while(getNodeById(taskNodes, getValueOfNode(sequenceFlow!!, "targetRef")) != null) {
-            val nextNode = getNodeById(taskNodes, getValueOfNode(sequenceFlow, "targetRef"))
-            choreo.add(nextNode!!)
-            println(getValueOfNode(nextNode, "name"))
-            outgoingNode = getChildNodeByName(nextNode, "bpmn2:outgoing")
-            sequenceFlow = getNodeById(sequenceFlows, outgoingNode!!.textContent)
-        }
-        if(getNodeById(endNodes, getValueOfNode(sequenceFlow, "targetRef")) != null){
-            choreo.add(getNodeById(endNodes, getValueOfNode(sequenceFlow, "targetRef"))!!)
-        }
-        return choreo
-    }
-
-    fun getInitParticipantForTask(taskNode: Node, participants: NodeList) : Node?{
-        for(i in 0..participants.length - 1){
-            if(getValueOfNode(participants.item(i), "id") == getValueOfNode(taskNode, "initiatingParticipantRef")){
-                return participants.item(i)
-            }
-        }
-        return null
-    }
-
-    fun getInitParticipantForTasks(doc: Document, choreoTasks: ArrayList<Node>) : ArrayList<Node> {
-        val participantNodes = getElementValuesByAttributeName(doc, "bpmn2:participant")
-        val initParticipants = ArrayList<Node>()
-        for(i in 1..choreoTasks.size - 2){
-            val participant = getInitParticipantForTask(choreoTasks.get(i), participantNodes)
-            initParticipants.add(participant!!)
-            println(getValueOfNode(participant, "name"))
-        }
-        return initParticipants
-    }
-
 
     fun crawlChilds(node: Node, participants: NodeList) : MutableSet<String>{
         val partsIDs = mutableSetOf<String>()
         val childs = node.childNodes
-
         for(i in 0..childs.length -1) {
             if(childs.item(i).nodeName == "bpmn2:participantRef") {
                 partsIDs.add(childs.item(i).textContent)
@@ -128,6 +63,9 @@ open class XmlReader(private val xmlPath : String) {
         for(i in 0..participants.size-1) {
             if(position != i) {
                 list += "val otherParty" + i + ": Party"
+                if(i < participants.size-1 && !(i + 1 == participants.size-1 && participants.size-1 == position)){
+                    list += ", "
+                }
             }
         }
         return list
@@ -307,7 +245,7 @@ open class XmlReader(private val xmlPath : String) {
                     "            txBuilder.verify(serviceHub)\n" +
                     "            requireThat {\n" +
                     "                \"only " + parts.elementAt(0).capitalize() + " can invoke this call\" using(serviceHub.myInfo.legalIdentities.first().name.organisation == \"" + parts.elementAt(0) + "\")\n" +
-                    "                \"not a reachable state\" using(serviceHub.vaultService.queryBy<Generatedside0f05a461e7046c68790a3249a304714State>().states.last().state.data.stateEnum + 1 == " + (i + 1) + ")\n" +
+                    "                \"not a reachable state\" using(serviceHub.vaultService.queryBy<Generated" + contractId + "State>().states.last().state.data.stateEnum + 1 == " + (i + 1) + ")\n" +
                     "            }\n" +
                     "\n" +
                     "            // Stage 3.\n" +
@@ -366,7 +304,7 @@ open class XmlReader(private val xmlPath : String) {
 
     fun generateFlowImport(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String) : String {
         var imports = ""
-        val participants = getElementValuesByAttributeName(doc, "participant")
+        val participants = getElementValuesByAttributeName(doc, "bpmn2:participant")
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
             val parts = crawlChilds(correspondingNode, participants)
@@ -478,7 +416,7 @@ open class XmlReader(private val xmlPath : String) {
         contractId = contractId.replace("-", "")
         val testing_files = File("../cordapp_template")
         val directory = "../cordapp_" + contractId.capitalize()
-        testing_files.copyRecursively(File(directory))
+        testing_files.copyRecursively(File(directory),true)
         val contractsFile = File(directory + "/contracts-kotlin/src/main/kotlin/com/generatedID")
         contractsFile.renameTo(File(directory + "/contracts-kotlin/src/main/kotlin/com/generated" + contractId))
         val workflowFile = File(directory + "/workflows-kotlin/src/main/kotlin/com/generatedID")
@@ -499,7 +437,6 @@ open class XmlReader(private val xmlPath : String) {
                                          serverDir + "/Server.kt",
                                          directory + "/clients/build.gradle",
                                          directory + "/gradle.properties")
-                                         directory + "/clients/build.gradle")
         val taskNodes = getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
         for (file in files) {
             val f = File(file)
