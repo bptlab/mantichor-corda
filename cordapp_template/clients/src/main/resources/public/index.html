@@ -31,8 +31,16 @@
     <form>
         <div class="modal-body">
             <div class="form-group">
-                <label for="counterparty" class="control-label">Counter-party:</label>
-                <select ng-model="modalInstance.form.counterparty" class="form-control" id="counterparty"
+                <label for="partyName0" class="control-label">Party A:</label>
+                <select ng-model="modalInstance.form.partyName0" class="form-control" id="partyName0"
+                        ng-options="peer as peer for peer in modalInstance.peers">
+                </select>
+                <label for="partyName1" class="control-label">Party B:</label>
+                <select ng-model="modalInstance.form.partyName1" class="form-control" id="partyName1"
+                        ng-options="peer as peer for peer in modalInstance.peers">
+                </select>
+                <label for="partyName2" class="control-label">Party C:</label>
+                <select ng-model="modalInstance.form.partyName2" class="form-control" id="partyName2"
                         ng-options="peer as peer for peer in modalInstance.peers">
                 </select>
             </div>

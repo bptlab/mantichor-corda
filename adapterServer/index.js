@@ -13,12 +13,12 @@ const server = http.createServer((request, response) => {
     case '/choreographies':
       let body = '';
       request.on('data', chunk => {
-          body += chunk.toString(); // convert Buffer to string
+          body += chunk.toString();
       });
       request.on('end', () => {
-          //console.log(body);
           const requestJson = JSON.parse(body);
-          exec('sh deploy.sh');
+          fs.writeFileSync('./choreo.bpmn', requestJson.xml);
+          exec('sh deploy.sh ' + requestJson.id);
 
       });
       contentType = 'application/json';

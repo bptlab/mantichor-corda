@@ -1,5 +1,6 @@
 java -jar XmlReader.jar
-cd ../cordapp_Side0f05a461e7046c68790a3249a304714
+echo "moving to $1"
+cd ../cordapp_$1
 chmod +x gradlew
 ./gradlew build
 ./gradlew deployNodes 

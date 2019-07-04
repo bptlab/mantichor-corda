@@ -10,7 +10,7 @@ app.config(['$qProvider', function ($qProvider) {
 app.controller('DemoAppController', function($http, $location, $uibModal) {
     const demoApp = this;
 
-    const apiBaseURL = "/api/generatedside0f05a461e7046c68790a3249a304714/";
+    const apiBaseURL = "/api/generatedchoreo/";
     let peers = [];
 
     $http.get(apiBaseURL + "me").then((response) => demoApp.thisNode = response.data.me);
@@ -57,26 +57,31 @@ app.controller('ModalInstanceCtrl', function ($http, $location, $uibModalInstanc
         modalInstance.create = function validateAndSendOrder() {
             modalInstance.formError = false;
             $uibModalInstance.close();
-
+            let commandData;
             let command = apiBaseURL;
             switch(parseFloat(modalInstance.form.stateEnum)) {
                 case 0:
                     command += "createChoreographie";
+                    commandData = $.param({
+                        partyName1: modalInstance.form.partyName1,
+                        partyName2: modalInstance.form.partyName2
+                    });
                     break
                 case 1:
-                    command += "PizzaBestellen";
+                    command += "Task1";
+                    commandData = $.param({
+                        partyName1: modalInstance.form.partyName1,
+                        partyName2: modalInstance.form.partyName2
+                    });
                     break
                 case 2:
-                    command += "PizzaLiefern";
-                    break;
-                case 3:
-                    command += "GeldKassieren";
+                    command += "Task2";
+                    commandData = $.param({
+                        partyName0: modalInstance.form.partyName0,
+                        partyName2: modalInstance.form.partyName2
+                    });
                     break;
             }
-
-            let commandData = $.param({
-                partyName: modalInstance.form.counterparty
-            });
 
             let commandHeaders = {
                 headers : {
