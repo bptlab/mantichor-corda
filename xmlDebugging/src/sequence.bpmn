@@ -3,9 +3,9 @@
   <bpmn2:message id="message_request_2" name="request 2" />
   <bpmn2:message id="message_request_1" name="request 1" />
   <bpmn2:choreography id="choreo">
-    <bpmn2:participant id="participant_a" name="A" />
-    <bpmn2:participant id="participant_b" name="B" />
-    <bpmn2:participant id="participant_c" name="C" />
+    <bpmn2:participant id="participant_a" name="PartyA" />
+    <bpmn2:participant id="participant_b" name="PArtyB" />
+    <bpmn2:participant id="participant_c" name="PartyC" />
     <bpmn2:messageFlow id="message_flow_request_2" sourceRef="participant_b" targetRef="participant_c" messageRef="message_request_2" />
     <bpmn2:messageFlow id="message_flow_request_1" sourceRef="participant_a" targetRef="participant_b" messageRef="message_request_1" />
     <bpmn2:startEvent id="start_event">

@@ -71,34 +71,15 @@ class MainController(rpc: NodeRPCConnection) {
      * The flow is invoked asynchronously. It returns a future when the flow's call() method returns.
      */
 
-    @PostMapping(value = [ "createChoreographie" ], produces = [ TEXT_PLAIN_VALUE ], headers = [ "Content-Type=application/x-www-form-urlencoded" ])
-    fun createChoreographie(request: HttpServletRequest): ResponseEntity<String> {
-        val partyName = request.getParameter("partyName")
-        if(partyName == null){
-            return ResponseEntity.badRequest().body("Query parameter 'partyName' must not be null.\n")
-        }
-        val partyX500Name = CordaX500Name.parse(partyName)
-        val otherParty = proxy.wellKnownPartyFromX500Name(partyX500Name) ?: return ResponseEntity.badRequest().body("Party named $partyName cannot be found.\n")
-
-        return try {
-            val signedTx = proxy.startTrackedFlow(::Initiator, otherParty).returnValue.getOrThrow()
-            ResponseEntity.status(HttpStatus.CREATED).body("Transaction id ${signedTx.id} committed to ledger.\n")
-
-        } catch (ex: Throwable) {
-            logger.error(ex.message, ex)
-            ResponseEntity.badRequest().body(ex.message!!)
-        }
-    }
-
     _AdditionalFunctions_
 
     /**
      * Displays all choreographie states that only this node has been involved in.
      */
-    @GetMapping(value = [ "myChoreographies" ], produces = [ APPLICATION_JSON_VALUE ])
+    /*@GetMapping(value = [ "myChoreographies" ], produces = [ APPLICATION_JSON_VALUE ])
     fun getMyChoreographies(): ResponseEntity<List<StateAndRef<Generated_ID_State>>>  {
         val myChoreographies = proxy.vaultQueryBy<Generated_ID_State>().states.filter { it.state.data.Kunde.equals(proxy.nodeInfo().legalIdentities.first()) }
         return ResponseEntity.ok(myChoreographies)
-    }
+    }*/
 
 }

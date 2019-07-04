@@ -71,6 +71,34 @@ open class XmlReader(private val xmlPath : String) {
         return list
     }
 
+    fun generateRpcParams(participants: MutableSet<String>, position: Int) : String {
+        var list = ""
+        for(i in 0..participants.size-1) {
+            if(position != i) {
+                list += "otherParty" + i
+                if(i < participants.size-1 && !(i + 1 == participants.size-1 && participants.size-1 == position)){
+                    list += ", "
+                }
+            }
+        }
+        return list
+    }
+
+    fun generateQueryParsing(participants: MutableSet<String>, position: Int) : String {
+        var parsing = ""
+        for(i in 0..participants.size-1) {
+            if (position != i) {
+                parsing += "        val partyName" + i + " = request.getParameter(\"partyName" + i + "\")\n" +
+                           "        if(partyName" + i + " == null){\n" +
+                           "            return ResponseEntity.badRequest().body(\"Query parameter 'partyName" + i + "' must not be null.\\n\")\n" +
+                           "        }\n" +
+                           "        val partyX500Name" + i + " = CordaX500Name.parse(partyName" + i + ")\n" +
+                           "        val otherParty" + i + " = proxy.wellKnownPartyFromX500Name(partyX500Name" + i + ") ?: return ResponseEntity.badRequest().body(\"Party named \$partyName" + i + " cannot be found.\\n\")\n"
+            }
+        }
+        return parsing
+    }
+
     fun generateOutputList(participants: MutableSet<String>, position: Int) : String {
         var list = ""
         for(i in 0..participants.size-1) {
@@ -316,26 +344,35 @@ open class XmlReader(private val xmlPath : String) {
         return imports
     }
 
-    fun generateRPCConnection(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList) : String {
+    fun generateRPCConnection(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, participantsSet: MutableSet<String>) : String {
         var rpcConnection = ""
         val participants = getElementValuesByAttributeName(doc, "bpmn2:participant")
+        rpcConnection += "@PostMapping(value = [ \"createChoreographie\" ], produces = [ TEXT_PLAIN_VALUE ], headers = [ \"Content-Type=application/x-www-form-urlencoded\" ])\n" +
+                "    fun createChoreographie(request: HttpServletRequest): ResponseEntity<String> {\n" +
+                generateQueryParsing(participantsSet, 0) +
+                "\n" +
+                "        return try {\n" +
+                "            val signedTx = proxy.startTrackedFlow(::Initiator, " + generateRpcParams(participantsSet, 0) + ").returnValue.getOrThrow()\n" +
+                "            ResponseEntity.status(HttpStatus.CREATED).body(\"Transaction id \${signedTx.id} committed to ledger.\\n\")\n" +
+                "\n" +
+                "        } catch (ex: Throwable) {\n" +
+                "            logger.error(ex.message, ex)\n" +
+                "            ResponseEntity.badRequest().body(ex.message!!)\n" +
+                "        }\n" +
+                "    }"
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
             val parts = crawlChilds(correspondingNode, participants)
             val command = tasks.elementAt(i)
             val camelCaseCommand = generateCamelCaseName(command)
             val initFlow = parts.elementAt(0) + camelCaseCommand.capitalize() + "Flow"
+            val position = getInitPosition(participantsSet, parts.elementAt(0))
             rpcConnection += "@PostMapping(value = [ \"" + camelCaseCommand + "\" ], produces = [ TEXT_PLAIN_VALUE ], headers = [ \"Content-Type=application/x-www-form-urlencoded\" ])\n" +
                     "    fun " + camelCaseCommand + "(request: HttpServletRequest): ResponseEntity<String> {\n" +
-                    "        val partyName = request.getParameter(\"partyName\")\n" +
-                    "        if(partyName == null){\n" +
-                    "            return ResponseEntity.badRequest().body(\"Query parameter 'partyName' must not be null.\\n\")\n" +
-                    "        }\n" +
-                    "        val partyX500Name = CordaX500Name.parse(partyName)\n" +
-                    "        val otherParty = proxy.wellKnownPartyFromX500Name(partyX500Name) ?: return ResponseEntity.badRequest().body(\"Party named \$partyName cannot be found.\\n\")\n" +
+                    generateQueryParsing(participantsSet, position) +
                     "\n" +
                     "        return try {\n" +
-                    "            val signedTx = proxy.startTrackedFlow(::" + initFlow + ", otherParty).returnValue.getOrThrow()\n" +
+                    "            val signedTx = proxy.startTrackedFlow(::" + initFlow + ", " + generateRpcParams(participantsSet, position) + ").returnValue.getOrThrow()\n" +
                     "            ResponseEntity.status(HttpStatus.CREATED).body(\"Transaction id \${signedTx.id} committed to ledger.\\n\")\n" +
                     "\n" +
                     "        } catch (ex: Throwable) {\n" +
@@ -467,7 +504,7 @@ open class XmlReader(private val xmlPath : String) {
             } else if(file == directory + "/contracts-kotlin/build.gradle") {
                 generatingFile = File(directory + "/contracts-kotlin/build.gradle")
             } else if(file == serverDir + "/MainController.kt"){
-                text = text.replace("_AdditionalFunctions_", generateRPCConnection(tasks, doc, taskNodes))
+                text = text.replace("_AdditionalFunctions_", generateRPCConnection(tasks, doc, taskNodes, participants))
                 text = text.replace("_FLOWS_", generateFlowImport(tasks, doc, taskNodes, contractId))
                 generatingFile = File(serverDir + "/MainController.kt")
             } else if(file == serverDir + "/NodeRPCConnection.kt"){
