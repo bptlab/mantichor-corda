@@ -29,9 +29,9 @@ fun main(args: Array<String>) {
         val node = taskNodes.item(i)
         if(getValueOfNode(node, "name") == task){
             val initRef = getValueOfNode(node, "initiatingParticipantRef")
-            for(i in 0..participants.length - 1) {
-                if(getValueOfNode(participants.item(i), "id") == initRef) {
-                    port = 5005 + i*3
+            for(j in 0..participants.length - 1) {
+                if(getValueOfNode(participants.item(j), "id") == initRef) {
+                    port = 5005 + j*3
                 }
             }
         }

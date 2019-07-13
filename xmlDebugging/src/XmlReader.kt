@@ -453,7 +453,7 @@ open class XmlReader(private val xmlPath : String) {
         contractId = contractId.replace("-", "")
         val testing_files = File("../cordapp_template")
         val directory = "../cordapp_" + contractId.capitalize()
-        testing_files.copyRecursively(File(directory),true)
+        testing_files.copyRecursively(File(directory))
         val contractsFile = File(directory + "/contracts-kotlin/src/main/kotlin/com/generatedID")
         contractsFile.renameTo(File(directory + "/contracts-kotlin/src/main/kotlin/com/generated" + contractId))
         val workflowFile = File(directory + "/workflows-kotlin/src/main/kotlin/com/generatedID")
@@ -541,7 +541,11 @@ fun main(args: Array<String>) {
         val node = participantNodes.item(i)
         participants.add(xmlReader.getValueOfNode(node, "name"))
     }
-    participants.forEach { e -> println(e)}
+    var server = ""
+    participants.forEach { e -> server += "run" + e.capitalize() + "Server\n"}
+    server.trim()
+    val deployServer = File("deployServer.txt")
+    deployServer.writeText(server)
 
     val taskNodes = xmlReader.getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
     val tasks = mutableSetOf<String>()

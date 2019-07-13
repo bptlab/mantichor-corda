@@ -47,20 +47,19 @@ fun getFollowTasksForTask(taskNode: Node, doc: Document) : MutableSet<String> {
 }
 
 fun main(args: Array<String>) {
-    val task = args[0]
+    val task = args[0].toInt()
     val doc = readXml("choreo.bpmn")
-
     val taskNodes = getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
-    var availableTasks = mutableSetOf<String>()
-    for(i in 0..taskNodes.length - 1) {
-        val node = taskNodes.item(i)
-        if(getValueOfNode(node, "name") == task){
-            availableTasks = getFollowTasksForTask(node, doc)
-        }
+    var taskPrints = ""
+    if(task == 0) {
+        taskPrints = getValueOfNode(taskNodes.item(0), "name")
+    } else if(task == taskNodes.length){
+        taskPrints = ""
+    } else {
+        val availableTasks = getFollowTasksForTask(taskNodes.item(task - 1), doc)
+        availableTasks.forEach { e -> taskPrints += e}
     }
     val generatingFile = File("tasks.txt")
-    var taskPrints = ""
-    availableTasks.forEach { e -> taskPrints += e}
     generatingFile.writeText(taskPrints)
 
 }

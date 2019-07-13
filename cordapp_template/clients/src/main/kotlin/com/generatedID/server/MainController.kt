@@ -55,8 +55,8 @@ class MainController(rpc: NodeRPCConnection) {
      * Displays all IOU states that exist in the node's vault.
      */
     @GetMapping(value = [ "choreographies" ], produces = [ APPLICATION_JSON_VALUE ])
-    fun getChoreographies() : ResponseEntity<List<StateAndRef<Generated_ID_State>>> {
-        return ResponseEntity.ok(proxy.vaultQueryBy<Generated_ID_State>().states)
+    fun getChoreographies() : ResponseEntity<String> {
+        return ResponseEntity.ok(proxy.vaultQueryBy<Generated_ID_State>().states.toString())
     }
 
     /**
