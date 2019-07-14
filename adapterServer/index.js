@@ -23,8 +23,13 @@ const server = http.createServer((request, response) => {
             console.log(err);
           } else {
             const rpcServer = fs.readFileSync('deployServer.txt', 'utf8').split('\n');
-            for(let i = 0; i < rpcServer.length; i++) {
-              exec('./gradlew ' + rpcServer[i]);
+            for(let i = 0; i < rpcServer.length-1; i++) {
+              const paths = __dirname.split('/');
+              let path = '';
+              for(let j = 0; j < paths.length - 1; j++){
+                path += paths[j] + '/';
+              }
+              setTimeout(() => openTab(path + 'cordapp_' + requestJsonDeploy.id + '/gradlew ' + rpcServer[i]), 4000 + i * 1000);
             }
             contentType = 'application/json';
             response.writeHead(200, {
@@ -44,7 +49,8 @@ const server = http.createServer((request, response) => {
       });
       request.on('end', () => {
         const requestJsonTasks = JSON.parse(bodyTasks);
-        http.get('http://localhost:50005/api/generatedchoreo/choreographies', (resp) => {
+        http.get('http://localhost:50005/api/generated' + requestJsonTasks.id.charAt(0).toLowerCase() + requestJsonTasks.id.slice(1) +
+          '/choreographies', (resp) => {
           let data = '';
           resp.on('data', chunk => {
               data += chunk.toString();
@@ -89,34 +95,84 @@ const server = http.createServer((request, response) => {
       });
       break;
     case 5:
-      console.log(params[2]);
-      contentType = 'application/json';
-      response.writeHead(200, {
-        'Content-Type': contentType
+      let bodyExecute = '';
+      request.on('data', chunk => {
+          bodyExecute += chunk.toString();
       });
-      response.write('Choreographie has been deployed successfully');
-      response.end();
-      break;
-    /*case '/testRPC':
-      http.get('http://localhost:50005/api/generatedchoreo/peers', (resp) => {
-        let data = '';
-        resp.on('data', chunk => {
-            data += chunk.toString();
-        });
-        resp.on('end', () => {
-            const peers = JSON.parse(data);
-            console.log(peers)
-            contentType = 'application/json';
-            response.writeHead(200, {
-              'Content-Type': contentType
+
+      request.on('end', () => {
+        const requestJsonExecute = JSON.parse(bodyExecute);
+        fs.writeFileSync('./choreo.bpmn', requestJsonExecute.xml);
+        const executeTask = requestJsonExecute.task[0].replace(' ', '\\ ');
+        exec('java -jar InitGen.jar ' + executeTask, (err, stdout, stderr) => {
+          const executeParam = fs.readFileSync('changeRequest.txt', 'utf8').split('\n');
+          let paramsString = '?';
+          for(let i = 1; i < executeParam.length; i++) {
+            paramsString += executeParam[i];
+            if(i < executeParam.length - 1) {
+              paramsString += '&'
+            }
+          }
+          while(paramsString.includes(' ')){
+            paramsString = paramsString.replace(' ', '');
+          }
+          if(requestJsonExecute.task[0].charAt(0).toUpperCase() + requestJsonExecute.task[0].slice(1) == 'Init'){
+            requestJsonExecute.task[0] = 'createChoreographie';
+          }
+          const options = {
+            hostname: 'localhost',
+            port: parseInt(executeParam[0]),
+            path: '/api/generated' + requestJsonExecute.id.charAt(0).toLowerCase() + requestJsonExecute.id.slice(1) +
+            '/' + requestJsonExecute.task[0].charAt(0).toUpperCase() + requestJsonExecute.task[0].slice(1) + paramsString,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          };
+          const postReq = http.request(options, (resp) => {
+            let data = '';
+            resp.on('data', chunk => {
+              data += chunk.toString();
             });
-            response.write(JSON.stringify(peers));
-            response.end();
+            resp.on('end', () => {
+              response.writeHead(200, {
+                'Content-Type': 'text/plain'
+              });
+              response.write(data);
+              response.end();
+            });
+          });
+          postReq.on('error', (e) => {
+            console.error(`problem with request: ${e.message}`)
+            response.writeHead(500, {
+              'Content-Type': 'text/plain'
+            });
+            response.write('ServerError');
+            response.end();;
+          });
+          postReq.end();
         });
       });
-      break;*/
+      break;
   }
 }).on('clientError', (err, socket) => {
   socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
 }).listen(8080);
 
+const openTab = (cmd) => {
+  if (process.platform !== 'darwin') {
+    throw new Error('No support for this operating system');
+  }
+
+  const open = ['osascript -e \'tell application "Terminal" to activate\' ',
+           '-e \'tell application "System Events" to tell process "Terminal" to keystroke "t"',
+           ' using command down\' ',
+           '-e \'tell application "Terminal" to do script ',
+           '"', cmd, '"',
+           ' in selected tab of the front window\''].join('');
+  child = exec(open, (error, stdout, stderr) => {
+    if (error) {
+      console.log(error)
+    }
+  });
+}

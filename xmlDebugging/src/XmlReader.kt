@@ -347,7 +347,7 @@ open class XmlReader(private val xmlPath : String) {
     fun generateRPCConnection(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, participantsSet: MutableSet<String>) : String {
         var rpcConnection = ""
         val participants = getElementValuesByAttributeName(doc, "bpmn2:participant")
-        rpcConnection += "@PostMapping(value = [ \"createChoreographie\" ], produces = [ TEXT_PLAIN_VALUE ], headers = [ \"Content-Type=application/x-www-form-urlencoded\" ])\n" +
+        rpcConnection += "@PostMapping(value = [ \"CreateChoreographie\" ], produces = [ TEXT_PLAIN_VALUE ], headers = [ \"Content-Type=application/x-www-form-urlencoded\" ])\n" +
                 "    fun createChoreographie(request: HttpServletRequest): ResponseEntity<String> {\n" +
                 generateQueryParsing(participantsSet, 0) +
                 "\n" +
