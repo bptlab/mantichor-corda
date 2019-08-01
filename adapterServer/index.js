@@ -24,12 +24,7 @@ const server = http.createServer((request, response) => {
           } else {
             const rpcServer = fs.readFileSync('deployServer.txt', 'utf8').split('\n');
             for(let i = 0; i < rpcServer.length-1; i++) {
-              const paths = __dirname.split('/');
-              let path = '';
-              for(let j = 0; j < paths.length - 1; j++){
-                path += paths[j] + '/';
-              }
-              setTimeout(() => exec('screen -d -m ' + path + 'cordapp_' + requestJsonDeploy.id + '/gradlew ' + rpcServer[i]), 30000 + i * 1000);
+              setTimeout(() => exec('sh deployNodeServer.sh ' + requestJsonDeploy.id + ' ' + rpcServer[i]), 30000 + i * 1000);
             }
             contentType = 'application/json';
             response.writeHead(200, {
