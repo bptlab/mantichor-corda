@@ -7,7 +7,7 @@ COPY ./constants.properties /usr/src/myapp/constants.properties
 WORKDIR /usr/src/myapp/adapterServer
 
 RUN apt-get update \
-    && apt-get install -y curl java-common locales procps
+    && apt-get install -y curl java-common locales procps screen
 
 RUN curl 'https://d3pxv6yz143wms.cloudfront.net/8.212.04.2/java-1.8.0-amazon-corretto-jdk_8.212.04-2_amd64.deb' -o java-8-amazon-corretto-jdk.deb -s \
     && dpkg --install java-8-amazon-corretto-jdk.deb \

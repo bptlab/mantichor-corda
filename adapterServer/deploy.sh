@@ -5,4 +5,4 @@ chmod +x gradlew
 ./gradlew build
 ./gradlew deployNodes
 cd workflows-kotlin/build/nodes
-screen -d java -jar workflows-kotlin/build/nodes/runnodes.jar
+screen -dm bash -c 'java -jar runnodes.jar; exec bash'

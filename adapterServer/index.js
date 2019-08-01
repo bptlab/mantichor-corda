@@ -29,7 +29,7 @@ const server = http.createServer((request, response) => {
               for(let j = 0; j < paths.length - 1; j++){
                 path += paths[j] + '/';
               }
-              setTimeout(() => openTab(path + 'cordapp_' + requestJsonDeploy.id + '/gradlew ' + rpcServer[i]), 4000 + i * 1000);
+              setTimeout(() => exec('screen -d -m ' + path + 'cordapp_' + requestJsonDeploy.id + '/gradlew ' + rpcServer[i]), 30000 + i * 1000);
             }
             contentType = 'application/json';
             response.writeHead(200, {
@@ -158,21 +158,3 @@ const server = http.createServer((request, response) => {
 }).on('clientError', (err, socket) => {
   socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
 }).listen(8080);
-
-const openTab = (cmd) => {
-  if (process.platform !== 'darwin') {
-    throw new Error('No support for this operating system');
-  }
-
-  const open = ['osascript -e \'tell application "Terminal" to activate\' ',
-           '-e \'tell application "System Events" to tell process "Terminal" to keystroke "t"',
-           ' using command down\' ',
-           '-e \'tell application "Terminal" to do script ',
-           '"', cmd, '"',
-           ' in selected tab of the front window\''].join('');
-  child = exec(open, (error, stdout, stderr) => {
-    if (error) {
-      console.log(error)
-    }
-  });
-}
