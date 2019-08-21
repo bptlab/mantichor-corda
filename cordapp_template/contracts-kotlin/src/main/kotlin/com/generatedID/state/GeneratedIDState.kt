@@ -12,7 +12,7 @@ import net.corda.core.schemas.MappedSchema
 import net.corda.core.schemas.PersistentState
 
 @BelongsToContract(Generated_ID_Contract::class)
-data class Generated_ID_State( PARTSINPUTval stateEnum: Int,
+data class Generated_ID_State( PARTSINPUTval stateEnum: String,
                                override val linearId: UniqueIdentifier = UniqueIdentifier()):
         LinearState, QueryableState {
     /** The public keys of the involved parties. */
