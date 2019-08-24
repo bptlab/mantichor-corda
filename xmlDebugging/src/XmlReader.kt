@@ -22,7 +22,7 @@ open class XmlReader(private val xmlPath : String) {
         return node.attributes.getNamedItem(valueName).nodeValue
     }
 
-    fun checkIfClosing(gateway: Node) : Boolean {
+    fun getOutgoingLines(gateway: Node) : Int {
         val connectors = gateway.childNodes
         var incomming = 0
         var outgoing = 0
@@ -34,13 +34,7 @@ open class XmlReader(private val xmlPath : String) {
                 outgoing++
             }
         }
-        if(incomming > 1) {
-            return true
-        }
-        if(outgoing > 1) {
-            return false
-        }
-        return false
+        return outgoing
     }
 
     fun checkGateWayType(doc: Document, source: String) : Node? {
@@ -68,7 +62,18 @@ open class XmlReader(private val xmlPath : String) {
         return null
     }
 
-    fun getTasksBeforeGateway(doc: Document, gatewayNode: Node) : String {
+    fun getPreviousTask(doc: Document, source: String) : String {
+        val tasksNodes = getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
+        for(i in 0..tasksNodes.length - 1) {
+            val node = tasksNodes.item(i)
+            if(getValueOfNode(node, "id") == source) {
+                return "" + i
+            }
+        }
+        return "0"
+    }
+
+    fun getTasksBeforeGateway(doc: Document, gatewayNode: Node) : MutableList<String> {
         val connectors = gatewayNode.childNodes
         var incomming = 0
         var outgoing = 0
@@ -80,92 +85,54 @@ open class XmlReader(private val xmlPath : String) {
                 outgoing++
             }
         }
-        if(outgoing > 1) {
-            println("more outgoing")
-            val childs = gatewayNode.childNodes
-            var incommingId = ""
-            for (i in 0..childs.length - 1) {
-                if (childs.item(i).nodeName == "bpmn2:incoming") {
-                    incommingId = childs.item(i).textContent
-                }
+        val childs = gatewayNode.childNodes
+        val incommingId = mutableSetOf<String>()
+        for (i in 0..childs.length - 1) {
+            if (childs.item(i).nodeName == "bpmn2:incoming") {
+                incommingId.add(childs.item(i).textContent)
             }
-            println(incommingId)
+        }
+        val prevIds = mutableListOf<String>()
+        for(i in 0..incommingId.size - 1) {
             val sequenzNodes = getElementValuesByAttributeName(doc, "bpmn2:sequenceFlow")
-            for (i in 0..sequenzNodes.length - 1) {
-                val node = sequenzNodes.item(i)
-                if (getValueOfNode(node, "id") == incommingId) {
-                    println("found sequenz " + getValueOfNode(node, "id"))
+            for (j in 0..sequenzNodes.length - 1) {
+                val node = sequenzNodes.item(j)
+                if (getValueOfNode(node, "id") == incommingId.elementAt(i)) {
                     val taskId = getValueOfNode(node, "sourceRef")
                     val taskNodes = getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
-                    for(j in 0..taskNodes.length - 1) {
-                        val taskNode = taskNodes.item(j)
+                    var foundone = false
+                    for(k in 0..taskNodes.length - 1) {
+                        val taskNode = taskNodes.item(k)
                         if(getValueOfNode(taskNode, "id") == taskId) {
-                            println("opening " + getValueOfNode(taskNode, "name"))
-                            return "" + (j + 1)
+                            println("closing " + getValueOfNode(taskNode, "name"))
+                            prevIds.add("" + (k + 1) )
+                            foundone = true
                         }
                     }
-                }
-            }
-        } else if(incomming > 1){
-            val childs = gatewayNode.childNodes
-            val incommingId = mutableSetOf<String>()
-            for (i in 0..childs.length - 1) {
-                if (childs.item(i).nodeName == "bpmn2:incoming") {
-                    incommingId.add(childs.item(i).textContent)
-                }
-            }
-            val prevIds = mutableListOf<String>()
-            for(i in 0..incommingId.size - 1) {
-                val sequenzNodes = getElementValuesByAttributeName(doc, "bpmn2:sequenceFlow")
-                for (j in 0..sequenzNodes.length - 1) {
-                    val node = sequenzNodes.item(j)
-                    if (getValueOfNode(node, "id") == incommingId.elementAt(i)) {
-                        val taskId = getValueOfNode(node, "sourceRef")
-                        val taskNodes = getElementValuesByAttributeName(doc, "bpmn2:choreographyTask")
-                        var foundone = false
-                        for(k in 0..taskNodes.length - 1) {
-                            val taskNode = taskNodes.item(k)
-                            if(getValueOfNode(taskNode, "id") == taskId) {
-                                println("closing " + getValueOfNode(taskNode, "name"))
-                                prevIds.add("" + (k + 1) )
-                                foundone = true
+                    if(!foundone) {
+                        val possibleGatewayNode = checkGateWayType(doc, taskId)
+                        if(possibleGatewayNode == null) {
+                            val startEvent = getElementValuesByAttributeName(doc, "bpmn2:startEvent")
+                            for(k in 0..startEvent.length - 1) {
+                                if(getValueOfNode(startEvent.item(k), "id") == taskId) {
+                                    prevIds.add("" + 0)
+                                    println("closing startEvent")
+                                }
                             }
-                        }
-                        if(!foundone) {
-                            val possibleGatewayNode = checkGateWayType(doc, taskId)
-                            if(possibleGatewayNode == null) {
-                                val startEvent = getElementValuesByAttributeName(doc, "bpmn2:startEvent")
-                                for(k in 0..startEvent.length - 1) {
-                                    if(getValueOfNode(startEvent.item(k), "id") == taskId) {
-                                        prevIds.add("" + 0)
-                                        println("closing startEvent")
-                                    }
-                                }
-                            } else {
-                                val resultString = getTasksBeforeGateway(doc, possibleGatewayNode)
-                                println(resultString)
-                                val states = resultString.split(",")
-                                for(k in 0..states.size - 1) {
-                                    prevIds.add(states.elementAt(k))
-                                }
+                        } else {
+                            val results = getTasksBeforeGateway(doc, possibleGatewayNode)
+                            for(k in 0..results.size - 1) {
+                                prevIds.add(results.elementAt(k))
                             }
                         }
                     }
                 }
             }
-            var returnString = ""
-            for(i in 0..prevIds.size - 1) {
-                returnString += prevIds.elementAt(i)
-                if(i < prevIds.size - 1) {
-                    returnString += ","
-                }
-            }
-            return returnString
         }
-        return "0"
+        return prevIds
     }
 
-    fun checkIfIncommingNodeIsGateway(doc: Document, taskNode: Node) {
+    fun checkIfIncommingNodeIsGateway(doc: Document, taskNode: Node) : String {
         val childs = taskNode.childNodes
         var incommingId = ""
         for(i in 0..childs.length - 1) {
@@ -181,32 +148,51 @@ open class XmlReader(private val xmlPath : String) {
                 val gatewayNode = checkGateWayType(doc, source)
                 if(gatewayNode == null) {
                     println("task")
-                    return
+                    return getPreviousTask(doc, source)
                 }
                 if (gatewayNode.nodeName == "bpmn2:exclusiveGateway") {
                     println("ExclusiveGateway")
-                    val closing = checkIfClosing(gatewayNode)
-                    println(getTasksBeforeGateway(doc, gatewayNode))
-                    if(closing) {
-                        println("closing exclusive")
-                    } else {
-                        println("opening exclusive")
+                    val tasks = getTasksBeforeGateway(doc, gatewayNode)
+                    var argumentString =  ""
+                    for(j in 0..tasks.size -1) {
+                        argumentString += "subStates.contrains(" + tasks.elementAt(j) + ")"
+                        if(j < tasks.size - 1) {
+                            argumentString += " || "
+                        }
                     }
+                    return argumentString
                 }
                 if (gatewayNode.nodeName == "bpmn2:eventBasedGateway") {
                     println("event_based_gateway")
+                    val tasks = getTasksBeforeGateway(doc, gatewayNode)
+                    var argumentString =  ""
+                    for(j in 0..tasks.size -1) {
+                        argumentString += "subStates.contrains(" + tasks.elementAt(j) + ")"
+                        if(j < tasks.size - 1) {
+                            argumentString += " || "
+                        }
+                    }
+                    return argumentString
                 }
                 if (gatewayNode.nodeName == "bpmn2:parallelGateway") {
-                    val closing = checkIfClosing(gatewayNode)
-                    if(closing) {
-                        println("closing parallel")
-                    } else {
-                        println("opening parallel")
+                    val outgoings = getOutgoingLines(gatewayNode)
+                    val tasks = getTasksBeforeGateway(doc, gatewayNode)
+                    var argumentString =  ""
+                    for(j in 0..tasks.size -1) {
+                        argumentString += "(subStates.contrains(" + tasks.elementAt(j) + ")"
+                        for(k in 1..outgoings - 1){
+                            argumentString += " || (subStates.contrains(" + tasks.elementAt(j) + "_" + k + ")"
+                        }
+                        argumentString += ")"
+                        if(j < tasks.size - 1) {
+                            argumentString += " && "
+                        }
                     }
+                    return argumentString
                 }
             }
         }
-
+        return ""
     }
 
     fun crawlChilds(node: Node, participants: NodeList) : MutableSet<String>{
@@ -410,7 +396,8 @@ open class XmlReader(private val xmlPath : String) {
                 "    }\n"
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
-            checkIfIncommingNodeIsGateway(doc, correspondingNode)
+            val checkString = checkIfIncommingNodeIsGateway(doc, correspondingNode)
+            println(checkString)
             val parts = crawlChilds(correspondingNode, participants)
             val command = tasks.elementAt(i)
             val camelCaseCommand = generateCamelCaseName(command)
@@ -448,7 +435,10 @@ open class XmlReader(private val xmlPath : String) {
                     "\n" +
                     "            // Stage 1.\n" +
                     "            progressTracker.currentStep = GENERATING_TRANSACTION\n" +
-                    "            // Generate an unsigned transaction.\n"
+                    "            // Generate an unsigned transaction.\n" +
+                    "            val currentState = serviceHub.vaultService.queryBy<Generated" + contractId + "State>().states.last().state.data.stateEnum\n" +
+                    "            val subStates = currentState.split(,)\n"+
+                    "            val validState = " + checkString + "\n"
             flow += "            val " + contractId + "State = Generated" + contractId + "State(" + generateWorkflowStateInput(participantsSet, position) + (i + 1) + ")\n"
             flow += "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + camelCaseCommand.capitalize() + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
                     "            val txBuilder = TransactionBuilder(notary)\n" +
@@ -460,8 +450,10 @@ open class XmlReader(private val xmlPath : String) {
                     "            // Verify that the transaction is valid.\n" +
                     "            txBuilder.verify(serviceHub)\n" +
                     "            requireThat {\n" +
-                    "                \"only " + parts.elementAt(0).capitalize() + " can invoke this call\" using(serviceHub.myInfo.legalIdentities.first().name.organisation == \"" + parts.elementAt(0) + "\")\n" +
-                    "                \"not a reachable state\" using(serviceHub.vaultService.queryBy<Generated" + contractId + "State>().states.last().state.data.stateEnum + 1 == " + (i + 1) + ")\n" +
+                    "                \"only " + parts.elementAt(0).capitalize() + " can invoke this call\" using(serviceHub.myInfo.legalIdentities.first().name.organisation == \"" + parts.elementAt(0) + "\")\n"
+
+
+            flow += "                \"not a reachable state\" using(serviceHub.vaultService.queryBy<Generated" + contractId + "State>().states.last().state.data.stateEnum + 1 == " + (i + 1) + ")\n" +
                     "            }\n" +
                     "\n" +
                     "            // Stage 3.\n" +

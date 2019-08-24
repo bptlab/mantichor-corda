@@ -1,0 +1,10 @@
+version: '2'
+
+services:
+
+  cordaadapter:
+    container_name: cordaadapter
+    restart: always
+    image: ferandal/cordaadapter
+    ports:
+      - 8080:8080
