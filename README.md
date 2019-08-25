@@ -73,18 +73,18 @@ For developing the bpmn parser:
 ! under `mantichor-corda\cordapp__XXX\gradle\wrapper`. 
 ! Then click on `Import changes`.
 ```
-4. Run the `build` Gradle task to compile our CorDapp project:
-        **Unix/Mac OSX:** `./gradlew build`
-        **Windows:** `gradlew.bat build`
-5. Run the `deployNodes` Gradle task to build four nodes with our CorDapp already installed on them:
-        **Unix/Mac OSX:** `./gradlew deployNodes`
-        **Windows:** `gradlew.bat deployNodes`
-6. Start the nodes by running the following command:
-    **Unix/Mac OSX:** workflows-kotlin/build/nodes/runnodes
-    **Windows:** call workflows-kotlin/build/nodes/runnodes.bat
-7. Each participant server needs to be started in its own terminal/command prompt, replace **participantID** with the specific participant id, e.g. *participant_a*:
-    **Unix/Mac OSX:** ./gradlew run**participantID**Server
-    **Windows:** gradlew.bat run**participantID**Server
+4. Run the `build` Gradle task to compile our CorDapp project:  
+        **Unix/Mac OSX:** `./gradlew build`  
+        **Windows:** `gradlew.bat build`  
+5. Run the `deployNodes` Gradle task to build four nodes with our CorDapp already installed on them:  
+        **Unix/Mac OSX:** `./gradlew deployNodes`  
+        **Windows:** `gradlew.bat deployNodes`  
+6. Start the nodes by running the following command:  
+    **Unix/Mac OSX:** workflows-kotlin/build/nodes/runnodes  
+    **Windows:** call workflows-kotlin/build/nodes/runnodes.bat  
+7. Each participant server needs to be started in its own terminal/command prompt, replace **participantID** with the specific participant id, e.g. *participant_a*:  
+    **Unix/Mac OSX:** ./gradlew run**participantID**Server   
+    **Windows:** gradlew.bat run**participantID**Server  
 ```diff
 + Under `mantichor-corda\bpmnParser\src\` you will find the file `deployServer.txt`, 
 + which the `XmlReader.kt` has also generated. There you have a list of the participants.
