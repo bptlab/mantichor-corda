@@ -51,7 +51,7 @@ With [Postman](https://www.getpostman.com/downloads/) you can then send requests
 * **Gradle 4.10** - the gradlew script in the project will download it for you.
 
 ### IntelliJ Settings
-1. Open IntelliJ
+1. Open IntelliJ.
 2. Open the folder `bpmnParser\src\` as project in IntelliJ.
 3. Make sure that the folder `src\` is marked as *Sources Root*.
 4. Click `File`, then `Project Structure`. Under `Project SDK:`, set the project SDK by clicking `New...`, clicking `JDK`, and navigating to `C:\Program Files\Java\jdk1.8.0_XXX` on Windows or `Library/Java/JavaVirtualMachines/jdk1.8.XXX` on MacOSX (where XXX is the latest minor version number). Click `Apply` followed by `OK`.
