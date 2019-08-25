@@ -2,7 +2,6 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const connections = new Set();
 const exec = require('child_process').exec;
 
 const server = http.createServer((request, response) => {
