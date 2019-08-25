@@ -28,7 +28,7 @@ Adapter for [Mantichor](https://github.com/bptlab/mantichor-frontend/wiki/Archit
 
 ## Deployment
 
-You can also start a **pre-built version** of the adapter using docker. Make sure that the latest versions of [`docker`](https://docs.docker.com/install/) is installed.
+You can start a **pre-built version** of the adapter using docker. Make sure that the latest versions of [`docker`](https://docs.docker.com/install/) is installed.
 
 ### Starting
 
