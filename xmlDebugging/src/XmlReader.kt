@@ -171,10 +171,6 @@ open class XmlReader(private val xmlPath : String) {
                     var argumentString =  "p"
                     for(j in 0..tasks.size -1) {
                         argumentString += tasks.elementAt(j)
-                        /*for(k in 1..outgoing - 1){
-                            argumentString += " || (subStates.contrains(" + tasks.elementAt(j) + "_" + k + ")"
-                        }
-                        argumentString += ")"*/
                         if(j < tasks.size - 1) {
                             argumentString += ","
                         }
@@ -754,7 +750,7 @@ open class XmlReader(private val xmlPath : String) {
 }
 
 fun main(args: Array<String>) {
-    val xmlReader = XmlReader("src/parallel.bpmn")
+    val xmlReader = XmlReader("choreo.bpmn")
     val doc = xmlReader.readXml()
     val participantNodes = xmlReader.getElementValuesByAttributeName(doc, "bpmn2:participant")
     val participants = mutableSetOf<String>()

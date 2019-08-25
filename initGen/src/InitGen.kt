@@ -28,7 +28,7 @@ fun main(args: Array<String>) {
     if(task == "init") {
         port = 50005
         for(j in 1..participants.length - 1) {
-            parties += "\npartyName" + j + "=O=" + getValueOfNode(participants.item(j), "name") +
+            parties += "\npartyName" + j + "=O=" + getValueOfNode(participants.item(j), "id") +
                     ", L=London, C=GB"
         }
     } else {
@@ -41,7 +41,7 @@ fun main(args: Array<String>) {
                     if(getValueOfNode(participants.item(j), "id") == initRef) {
                         port = 50005 + j*3
                     } else {
-                        parties += "\npartyName" + j + "=O=" + getValueOfNode(participants.item(j), "name") +
+                        parties += "\npartyName" + j + "=O=" + getValueOfNode(participants.item(j), "id") +
                                 ", L=London, C=GB"
                     }
                 }
