@@ -100,7 +100,6 @@ open class XmlReader(private val xmlPath : String) {
                     for(k in 0..taskNodes.length - 1) {
                         val taskNode = taskNodes.item(k)
                         if(getValueOfNode(taskNode, "id") == taskId) {
-                            println("closing " + getValueOfNode(taskNode, "name"))
                             prevIds.add("" + (k + 1) )
                             foundone = true
                         }
@@ -112,7 +111,6 @@ open class XmlReader(private val xmlPath : String) {
                             for(k in 0..startEvent.length - 1) {
                                 if(getValueOfNode(startEvent.item(k), "id") == taskId) {
                                     prevIds.add("" + 0)
-                                    println("closing startEvent")
                                 }
                             }
                         } else {
@@ -188,23 +186,8 @@ open class XmlReader(private val xmlPath : String) {
         return ""
     }
 
-    fun crawlChilds(node: Node, participants: NodeList) : MutableSet<String>{
-        val partsIDs = mutableSetOf<String>()
-        val childs = node.childNodes
-        for(i in 0..childs.length -1) {
-            if(childs.item(i).nodeName == "bpmn2:participantRef") {
-                partsIDs.add(childs.item(i).textContent)
-            }
-        }
-        val parts = mutableSetOf<String>()
-        for(i in 0..participants.length - 1) {
-            for(j in 0..partsIDs.size - 1){
-                if(getValueOfNode(participants.item(i), "id") == partsIDs.elementAt(j)){
-                    parts.add(getValueOfNode(participants.item(i), "id"))
-                }
-            }
-        }
-        return parts
+    fun getInitParticipant(node: Node) : String {
+        return getValueOfNode(node, "initiatingParticipantRef")
     }
 
     fun generateCamelCaseName(task: String) : String{
@@ -318,21 +301,40 @@ open class XmlReader(private val xmlPath : String) {
                      "            for(i in 0..subStates.size - 1) {\n" +
                      "                if( "
         for(i in 0..checkString.size - 1) {
-            output += "(subStates[i] == \"" + checkString[i] + "\""
-            if(mode == 'p') {
-                for(j in 1..outgoing - 1) {
-                    output += " || subStates[i] == \"" + checkString[i] + "_" + outgoing + "\""
+            when (mode) {
+                'e' -> {
+                    output += "(subStates[i].split(\"_\")[0] == \"" + checkString[i] + "\")"
+                    if(i < checkString.size - 1) {
+                        output += " || "
+                    }
                 }
-            }
-            output += ")"
-            if(i < checkString.size - 1) {
-                when (mode) {
-                    'e' -> output += " || "
-                    'p' -> output += " && "
+                'p' -> {
+                    if(outgoing < 2) {
+                        output += "subStates.contains(\"" + checkString[i] + "\")"
+                        if (i < checkString.size - 1) {
+                            output += " && "
+                        }
+                    } else {
+                        output += "(subStates[i].split(\"_\")[0] == \"" + checkString[i] + "\")"
+                        if(i < checkString.size - 1) {
+                            output += " || "
+                        }
+                    }
                 }
             }
         }
-        output += ") {\n"
+        if(mode == 'p' && outgoing < 2) {
+            output += " && ("
+            for(i in 0..checkString.size - 1) {
+                output += "(subStates[i].split(\"_\")[0] == \"" + checkString[i] + "\")"
+                if(i < checkString.size - 1) {
+                    output += " || "
+                }
+            }
+            output += ")) {\n"
+        } else {
+            output += ") {\n"
+        }
         output += "                    position = i\n" +
                  "                }\n" +
                  "                if(subStates[i] == \"" + futureState + "\" || subStates[i].split(\"_\")[0] == \"" + futureState + "\") {\n" +
@@ -340,25 +342,18 @@ open class XmlReader(private val xmlPath : String) {
                  "                }\n" +
                  "            }\n" +
                  "            if (position != -1) {\n" +
-                 "                "
+                 "                val checking = subStates[position].split(\"_\")\n" +
+                 "                for(i in 1..checking.size - 1) {\n" +
+                 "                    if(checking[i] == \"" + futureState + "\") {\n" +
+                 "                        foundInvalidity = true\n" +
+                 "                    }\n" +
+                 "                }\n"
         if(mode == 'p') {
-            output += "var oldState = subStates[position].split(\"_\")\n" +
-                      "                if(oldState.size == 1) {\n"
-            if(outgoing > 1) {
-                output += "                        subStates[position] = \"" + futureState + "_1\"\n"
-            } else {
-                output += "                        subStates[position] = \"" + futureState + "\"\n"
-            }
-            output += "                } else {\n" +
-                      "                    if(oldState[1].toInt() == " + (outgoing - 1) + ") {\n" +
-                      "                        subStates[position] = " + futureState + "\n" +
-                      "                    } else {\n" +
-                      "                        subStates[position] = subStates[position].dropLast(1) + (oldState[1].toInt() + 1)\n" +
-                      "                        newState += \"" + futureState + ",\"\n" +
-                      "                    }\n" +
-                      "                }\n"
+            output += "                subStates[position] += \"_" + futureState + "\"\n" +
+                    "                newState += \"" + futureState + ",\"\n"
+
         } else {
-            output += "subStates[position] = \"" + futureState + "\"\n"
+            output += "                subStates[position] = \"" + futureState + "\"\n"
         }
         output += "                for(i in 0..subStates.size - 1) {\n" +
                   "                    newState += subStates[i]\n" +
@@ -451,12 +446,11 @@ open class XmlReader(private val xmlPath : String) {
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
             val gatewayCheck = checkIfIncommingNodeIsGateway(doc, correspondingNode)
-            val parts = crawlChilds(correspondingNode, participants)
             val command = tasks.elementAt(i)
             val camelCaseCommand = generateCamelCaseName(command)
-            val initFlow = parts.elementAt(0) + camelCaseCommand.capitalize() + "Flow"
+            val initFlow = getInitParticipant(correspondingNode) + camelCaseCommand.capitalize() + "Flow"
             val reactingFlow = "reaction" + camelCaseCommand.capitalize() + "Flow"
-            val position = getInitPosition(participantsSet, parts.elementAt(0))
+            val position = getInitPosition(participantsSet, getInitParticipant(correspondingNode))
             flow += "    @InitiatingFlow\n" +
                     "    @StartableByRPC\n" +
                     "    class " + initFlow + "(" + generateInputList(participantsSet, position) + ") : FlowLogic<SignedTransaction>() {\n"
@@ -503,7 +497,7 @@ open class XmlReader(private val xmlPath : String) {
                     "            // Verify that the transaction is valid.\n" +
                     "            txBuilder.verify(serviceHub)\n" +
                     "            requireThat {\n" +
-                    "                \"only " + parts.elementAt(0).capitalize() + " can invoke this call\" using(serviceHub.myInfo.legalIdentities.first().name.organisation == \"" + parts.elementAt(0) + "\")\n" +
+                    "                \"only " + getInitParticipant(correspondingNode).capitalize() + " can invoke this call\" using(serviceHub.myInfo.legalIdentities.first().name.organisation == \"" + getInitParticipant(correspondingNode) + "\")\n" +
                     "                \"not a reachable state\" using(position != - 1 && !foundInvalidity)\n" +
                     "            }\n" +
                     "\n" +
@@ -566,10 +560,9 @@ open class XmlReader(private val xmlPath : String) {
         val participants = getElementValuesByAttributeName(doc, "bpmn2:participant")
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
-            val parts = crawlChilds(correspondingNode, participants)
             val command = tasks.elementAt(i)
             val camelCaseCommand = generateCamelCaseName(command)
-            val initFlow = parts.elementAt(0) + camelCaseCommand.capitalize() + "Flow"
+            val initFlow = getInitParticipant(correspondingNode) + camelCaseCommand.capitalize() + "Flow"
             imports += "import com.generated" + contractId + ".flow.ExampleFlow." + initFlow + "\n"
         }
         return imports
@@ -593,11 +586,10 @@ open class XmlReader(private val xmlPath : String) {
                 "    }"
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
-            val parts = crawlChilds(correspondingNode, participants)
             val command = tasks.elementAt(i)
             val camelCaseCommand = generateCamelCaseName(command)
-            val initFlow = parts.elementAt(0) + camelCaseCommand.capitalize() + "Flow"
-            val position = getInitPosition(participantsSet, parts.elementAt(0))
+            val initFlow = getInitParticipant(correspondingNode) + camelCaseCommand.capitalize() + "Flow"
+            val position = getInitPosition(participantsSet, getInitParticipant(correspondingNode))
             rpcConnection += "@PostMapping(value = [ \"" + camelCaseCommand + "\" ], produces = [ TEXT_PLAIN_VALUE ], headers = [ \"Content-Type=application/x-www-form-urlencoded\" ])\n" +
                     "    fun " + camelCaseCommand + "(request: HttpServletRequest): ResponseEntity<String> {\n" +
                     generateQueryParsing(participantsSet, position) +
@@ -761,10 +753,8 @@ open class XmlReader(private val xmlPath : String) {
 
 }
 
-//TO-DO: get rid of unnessassary calls
-//       refactor into multiple functions to reduce code duplication
 fun main(args: Array<String>) {
-    val xmlReader = XmlReader("src/order.bpmn")
+    val xmlReader = XmlReader("src/parallel.bpmn")
     val doc = xmlReader.readXml()
     val participantNodes = xmlReader.getElementValuesByAttributeName(doc, "bpmn2:participant")
     val participants = mutableSetOf<String>()
@@ -784,8 +774,5 @@ fun main(args: Array<String>) {
         val node = taskNodes.item(i)
         tasks.add(xmlReader.getValueOfNode(node, "name"))
     }
-    tasks.forEach { e -> println(e)}
-
-    println()
     xmlReader.generateContractFile(doc, participants, tasks)
 }
