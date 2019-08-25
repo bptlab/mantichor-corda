@@ -20,7 +20,7 @@ data class Generated_ID_State( PARTSINPUTval stateEnum: String,
     override fun generateMappedObject(schema: MappedSchema): PersistentState {
         return when (schema) {
             is _ID_V1 -> _ID_V1.Persistent_ID_(
-                    SCHEMAINPUTthis.stateEnum.toString(),
+                    SCHEMAINPUTthis.stateEnum,
                     this.linearId.id
             )
             else -> throw IllegalArgumentException("Unrecognised schema $schema")

@@ -24,12 +24,8 @@ open class XmlReader(private val xmlPath : String) {
 
     fun getOutgoingLines(gateway: Node) : Int {
         val connectors = gateway.childNodes
-        var incomming = 0
         var outgoing = 0
         for(i in 0..connectors.length - 1) {
-            if(connectors.item(i).nodeName == "bpmn2:incoming") {
-                incomming++
-            }
             if(connectors.item(i).nodeName == "bpmn2:outgoing") {
                 outgoing++
             }
@@ -147,48 +143,45 @@ open class XmlReader(private val xmlPath : String) {
                 val source = getValueOfNode(node, "sourceRef")
                 val gatewayNode = checkGateWayType(doc, source)
                 if(gatewayNode == null) {
-                    println("task")
-                    return getPreviousTask(doc, source)
+                    return "t" + getPreviousTask(doc, source) + "%" + 1
                 }
+                val outgoing = getOutgoingLines(gatewayNode)
                 if (gatewayNode.nodeName == "bpmn2:exclusiveGateway") {
-                    println("ExclusiveGateway")
                     val tasks = getTasksBeforeGateway(doc, gatewayNode)
-                    var argumentString =  ""
+                    var argumentString =  "e"
                     for(j in 0..tasks.size -1) {
-                        argumentString += "subStates.contrains(" + tasks.elementAt(j) + ")"
+                        argumentString += tasks.elementAt(j)
                         if(j < tasks.size - 1) {
-                            argumentString += " || "
+                            argumentString += ","
                         }
                     }
-                    return argumentString
+                    return argumentString + "%" + outgoing
                 }
                 if (gatewayNode.nodeName == "bpmn2:eventBasedGateway") {
-                    println("event_based_gateway")
                     val tasks = getTasksBeforeGateway(doc, gatewayNode)
-                    var argumentString =  ""
+                    var argumentString =  "e"
                     for(j in 0..tasks.size -1) {
-                        argumentString += "subStates.contrains(" + tasks.elementAt(j) + ")"
+                        argumentString += tasks.elementAt(j)
                         if(j < tasks.size - 1) {
-                            argumentString += " || "
+                            argumentString += ","
                         }
                     }
-                    return argumentString
+                    return argumentString + "%" + outgoing
                 }
                 if (gatewayNode.nodeName == "bpmn2:parallelGateway") {
-                    val outgoings = getOutgoingLines(gatewayNode)
                     val tasks = getTasksBeforeGateway(doc, gatewayNode)
-                    var argumentString =  ""
+                    var argumentString =  "p"
                     for(j in 0..tasks.size -1) {
-                        argumentString += "(subStates.contrains(" + tasks.elementAt(j) + ")"
-                        for(k in 1..outgoings - 1){
+                        argumentString += tasks.elementAt(j)
+                        /*for(k in 1..outgoing - 1){
                             argumentString += " || (subStates.contrains(" + tasks.elementAt(j) + "_" + k + ")"
                         }
-                        argumentString += ")"
+                        argumentString += ")"*/
                         if(j < tasks.size - 1) {
-                            argumentString += " && "
+                            argumentString += ","
                         }
                     }
-                    return argumentString
+                    return argumentString + "%" + outgoing
                 }
             }
         }
@@ -315,6 +308,67 @@ open class XmlReader(private val xmlPath : String) {
         }
         return input
     }
+    fun buildStateExchange(gatewayCheck: String, futureState: Int) : String {
+        val mode = gatewayCheck.get(0)
+        val checkString = gatewayCheck.drop(1).split("%")[0].split(",")
+        val outgoing = gatewayCheck.drop(1).split("%")[1].toInt()
+        var output = "            var position = -1\n" +
+                     "            var newState = \"\"\n" +
+                     "            var foundInvalidity = false\n" +
+                     "            for(i in 0..subStates.size - 1) {\n" +
+                     "                if( "
+        for(i in 0..checkString.size - 1) {
+            output += "(subStates[i] == \"" + checkString[i] + "\""
+            if(mode == 'p') {
+                for(j in 1..outgoing - 1) {
+                    output += " || subStates[i] == \"" + checkString[i] + "_" + outgoing + "\""
+                }
+            }
+            output += ")"
+            if(i < checkString.size - 1) {
+                when (mode) {
+                    'e' -> output += " || "
+                    'p' -> output += " && "
+                }
+            }
+        }
+        output += ") {\n"
+        output += "                    position = i\n" +
+                 "                }\n" +
+                 "                if(subStates[i] == \"" + futureState + "\" || subStates[i].split(\"_\")[0] == \"" + futureState + "\") {\n" +
+                 "                    foundInvalidity = true\n" +
+                 "                }\n" +
+                 "            }\n" +
+                 "            if (position != -1) {\n" +
+                 "                "
+        if(mode == 'p') {
+            output += "var oldState = subStates[position].split(\"_\")\n" +
+                      "                if(oldState.size == 1) {\n"
+            if(outgoing > 1) {
+                output += "                        subStates[position] = \"" + futureState + "_1\"\n"
+            } else {
+                output += "                        subStates[position] = \"" + futureState + "\"\n"
+            }
+            output += "                } else {\n" +
+                      "                    if(oldState[1].toInt() == " + (outgoing - 1) + ") {\n" +
+                      "                        subStates[position] = " + futureState + "\n" +
+                      "                    } else {\n" +
+                      "                        subStates[position] = subStates[position].dropLast(1) + (oldState[1].toInt() + 1)\n" +
+                      "                        newState += \"" + futureState + ",\"\n" +
+                      "                    }\n" +
+                      "                }\n"
+        } else {
+            output += "subStates[position] = \"" + futureState + "\"\n"
+        }
+        output += "                for(i in 0..subStates.size - 1) {\n" +
+                  "                    newState += subStates[i]\n" +
+                  "                    if(i < subStates.size -1) { \n" +
+                  "                        newState += \",\"\n" +
+                  "                    }\n" +
+                  "                }\n" +
+                  "            }\n"
+        return  output
+    }
 
     fun generateFlow(tasks: MutableSet<String>, doc: Document, nodeTasks: NodeList, contractId: String, participantsSet: MutableSet<String>) : String {
         var flow = ""
@@ -351,7 +405,7 @@ open class XmlReader(private val xmlPath : String) {
                 "            // Stage 1.\n" +
                 "            progressTracker.currentStep = GENERATING_TRANSACTION\n" +
                 "            // Generate an unsigned transaction.\n" +
-                "            val " + contractId + "State = Generated" + contractId + "State(" + generateWorkflowStateInput(participantsSet, 0) + "0)\n" +
+                "            val " + contractId + "State = Generated" + contractId + "State(" + generateWorkflowStateInput(participantsSet, 0) + "\"0\")\n" +
                 "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + "Create" + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
                 "            val txBuilder = TransactionBuilder(notary)\n" +
                 "                    .addOutputState(" + contractId + "State, Generated" + contractId + "Contract.ID)\n" +
@@ -396,8 +450,7 @@ open class XmlReader(private val xmlPath : String) {
                 "    }\n"
         for(i in 0..tasks.size - 1) {
             val correspondingNode = nodeTasks.item(i)
-            val checkString = checkIfIncommingNodeIsGateway(doc, correspondingNode)
-            println(checkString)
+            val gatewayCheck = checkIfIncommingNodeIsGateway(doc, correspondingNode)
             val parts = crawlChilds(correspondingNode, participants)
             val command = tasks.elementAt(i)
             val camelCaseCommand = generateCamelCaseName(command)
@@ -437,9 +490,9 @@ open class XmlReader(private val xmlPath : String) {
                     "            progressTracker.currentStep = GENERATING_TRANSACTION\n" +
                     "            // Generate an unsigned transaction.\n" +
                     "            val currentState = serviceHub.vaultService.queryBy<Generated" + contractId + "State>().states.last().state.data.stateEnum\n" +
-                    "            val subStates = currentState.split(,)\n"+
-                    "            val validState = " + checkString + "\n"
-            flow += "            val " + contractId + "State = Generated" + contractId + "State(" + generateWorkflowStateInput(participantsSet, position) + (i + 1) + ")\n"
+                    "            val subStates = currentState.split(\",\").toMutableList()\n"+
+                    buildStateExchange(gatewayCheck, i + 1)
+            flow += "            val " + contractId + "State = Generated" + contractId + "State(" + generateWorkflowStateInput(participantsSet, position) + "newState)\n"
             flow += "            val txCommand = Command(Generated" + contractId + "Contract.Commands." + camelCaseCommand.capitalize() + "(), " + contractId + "State.participants.map { it.owningKey })\n" +
                     "            val txBuilder = TransactionBuilder(notary)\n" +
                     "                    .addOutputState(" + contractId + "State, Generated" + contractId + "Contract.ID)\n" +
@@ -450,10 +503,8 @@ open class XmlReader(private val xmlPath : String) {
                     "            // Verify that the transaction is valid.\n" +
                     "            txBuilder.verify(serviceHub)\n" +
                     "            requireThat {\n" +
-                    "                \"only " + parts.elementAt(0).capitalize() + " can invoke this call\" using(serviceHub.myInfo.legalIdentities.first().name.organisation == \"" + parts.elementAt(0) + "\")\n"
-
-
-            flow += "                \"not a reachable state\" using(serviceHub.vaultService.queryBy<Generated" + contractId + "State>().states.last().state.data.stateEnum + 1 == " + (i + 1) + ")\n" +
+                    "                \"only " + parts.elementAt(0).capitalize() + " can invoke this call\" using(serviceHub.myInfo.legalIdentities.first().name.organisation == \"" + parts.elementAt(0) + "\")\n" +
+                    "                \"not a reachable state\" using(position != - 1 && !foundInvalidity)\n" +
                     "            }\n" +
                     "\n" +
                     "            // Stage 3.\n" +

@@ -16,7 +16,7 @@ object _ID_V1 : MappedSchema(
     @Entity
     @Table(name = "_ID__states")
     class Persistent_ID_(
-            tables
+tables
 
             @Column(name = "linear_id")
     var linearId: UUID
