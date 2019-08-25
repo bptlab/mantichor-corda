@@ -36,7 +36,7 @@ Open a terminal window and use `docker pull ferandal/cordaadapter` and then `doc
 
 ### Stopping
 
-To stop the server just kill the docker container. `Docker kill (DockerID)`
+To stop the server just kill the docker container: `Docker kill (DockerID)`.
 
 ### Execute tasks
 
