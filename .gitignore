@@ -9,3 +9,6 @@ generated_contracts/
 private/
 **/production
 **/cordapp_S*
+adapterServer/choreo.bpmn
+cordapp_*
+xmlDebugging/deployServer.txt
