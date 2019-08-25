@@ -20,7 +20,7 @@ Adapter for [Mantichor](https://github.com/bptlab/mantichor-frontend/wiki/Archit
 * `cordapp_template/` | intelliJ CorDapp project as template
 * `initGen/` | src for the pre-built jar to calculate the participant list and the right address for task execution
 * `tasksGen/` | src for the pre-built jar to calculate executable tasks based on corda state
-* `xmlDebugging/` | src for the pre-built jar for bpmn parsing and project generation
+* `bpmnParser/src/` | src for the pre-built jar for bpmn parsing and project generation
 * `.gitignore` | files ignored by Git
 * `Dockerfile` | Docker configuration
 * `README.md` | Readme about the repository
@@ -52,7 +52,7 @@ With [Postman](https://www.getpostman.com/downloads/) you can then send requests
 
 ### IntelliJ Settings
 1. Open IntelliJ
-2. Open the folder `xmlDebugging\` as project in IntelliJ.
+2. Open the folder `bpmnParser\src\` as project in IntelliJ.
 3. Make sure that the folder `src\` is marked as *Sources Root*.
 4. Click `File`, then `Project Structure`. Under `Project SDK:`, set the project SDK by clicking `New...`, clicking `JDK`, and navigating to `C:\Program Files\Java\jdk1.8.0_XXX` on Windows or `Library/Java/JavaVirtualMachines/jdk1.8.XXX` on MacOSX (where XXX is the latest minor version number). Click `Apply` followed by `OK`.
 5. Again under `File` then `Project Structure`, select `Modules`. Click `+`, then `Import Module`, then select the `cordapp-template` folder and click `Open`. Choose to `Import module from external model`, select `Gradle`, click `Next` then `Finish` (leaving the defaults) and `OK`.
@@ -86,7 +86,7 @@ For developing the bpmn parser:
     **Unix/Mac OSX:** ./gradlew run**participantID**Server
     **Windows:** gradlew.bat run**participantID**Server
 ```diff
-+ Under `mantichor-corda\xmlDebugging\` you will find the file `deployServer.txt`, 
++ Under `mantichor-corda\bpmnParser\src\` you will find the file `deployServer.txt`, 
 + which the `XmlReader.kt` has also generated. There you have a list of the participants.
 ```
 
