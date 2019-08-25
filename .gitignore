@@ -11,4 +11,4 @@ private/
 **/cordapp_S*
 adapterServer/choreo.bpmn
 cordapp_*
-xmlDebugging/deployServer.txt
+bpmnParser/deployServer.txt
