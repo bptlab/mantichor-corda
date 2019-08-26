@@ -60,6 +60,10 @@ With [Postman](https://www.getpostman.com/downloads/) you can then send requests
 For developing the bpmn parser:
 1. Inside of the main() function of the XmlReader.kt you have to set the path to the testing bpmn. The default value is choreo.bpmn as this is used by the adapter server.
 2. Run the `XmlReader.kt`, which will generate a CorDapp project for the BPMN under `mantichor-corda\cordapp__XXX\` (XXX = id of the BPMN).
+```diff
+! If you want to run XmlReader.kt for the first time, a popup window will appear, 
+! where you simply click on "Configure Kotlin" and then select "Java".
+```
 3. Open a terminal window in the `cordapp_XXX` directory. 
 ```diff
 ! For Windows: The project is build for the Unix platform. 
