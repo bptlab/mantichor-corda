@@ -317,6 +317,12 @@ open class XmlReader(private val xmlPath : String) {
                         }
                     }
                 }
+                't' -> {
+                    output += "(subStates[i].split(\"_\")[0] == \"" + checkString[i] + "\")"
+                    if(i < checkString.size - 1) {
+                        output += " || "
+                    }
+                }
             }
         }
         if(mode == 'p' && outgoing < 2) {
